@@ -19,6 +19,7 @@ _UPSTREAM_KEYLAYOUT = (
 )
 
 _ACTION_PREFIX = "xkb_"
+_INDENT_SPACES_PER_TAB = 2
 _UNICODE_KEYSYM_MIN_LENGTH = 5
 _TOKEN_RE = re.compile(r"<([^>]+)>")
 _OUTPUT_RE = re.compile(r':\s*"((?:\\.|[^"\\])*)"')
@@ -121,7 +122,7 @@ def _main() -> None:
         _generate_terminators(trie),
     )
 
-    args.output.write_text(keylayout, encoding="utf-8")
+    args.output.write_text(_normalize_leading_indentation(keylayout), encoding="utf-8")
 
 
 def _xkb_action_id(character: str) -> str:
@@ -138,6 +139,22 @@ def _xml_escape(value: str) -> str:
 
 def _xml_unescape(value: str) -> str:
     return html.unescape(value)
+
+
+def _normalize_leading_indentation(text: str) -> str:
+    lines: list[str] = []
+    for line in text.splitlines(keepends=True):
+        content = line.lstrip(" \t")
+        leading = line[: len(line) - len(content)]
+        if not leading:
+            lines.append(line)
+            continue
+
+        spaces = leading.count(" ")
+        tabs = leading.count("\t")
+        indent = tabs + (spaces + _INDENT_SPACES_PER_TAB - 1) // _INDENT_SPACES_PER_TAB
+        lines.append(f"{'\t' * indent}{content}")
+    return "".join(lines)
 
 
 def _extract_from_cpio(archive: bytes, wanted_name: str) -> bytes:
