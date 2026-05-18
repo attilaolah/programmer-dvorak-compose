@@ -10,43 +10,43 @@
     hash = "sha256-hC/69xSqrJGwKHxORXbxi+G/wyaTcJWToRhXKnzHgAY=";
   };
 in
-stdenvNoCC.mkDerivation {
-  pname = "programmer-dvorak-compose";
-  version = "1.2.1";
+  stdenvNoCC.mkDerivation {
+    pname = "programmer-dvorak-compose";
+    version = "1.2.1";
 
-  src = ./.;
+    src = ./.;
 
-  nativeBuildInputs = [
-    python314
-  ];
+    nativeBuildInputs = [
+      python314
+    ];
 
-  dontConfigure = true;
+    dontConfigure = true;
 
-  buildPhase = ''
-    runHook preBuild
+    buildPhase = ''
+      runHook preBuild
 
-    python3.14 scripts/generate_keylayout.py \
-      --programmer-dvorak-pkg ${programmerDvorakPkg} \
-      --libx11-src ${libx11.src} \
-      --output programmer_dvorak_compose.keylayout
+      python3.14 scripts/generate_keylayout.py \
+        --programmer-dvorak-pkg ${programmerDvorakPkg} \
+        --libx11-src ${libx11.src} \
+        --output programmer_dvorak_compose.keylayout
 
-    runHook postBuild
-  '';
+      runHook postBuild
+    '';
 
-  installPhase = ''
-    runHook preInstall
+    installPhase = ''
+      runHook preInstall
 
-    install -Dm0644 info.plist "$out/info.plist"
-    install -Dm0644 version.plist "$out/version.plist"
-    install -Dm0644 resources/english.lproj/info_plist.strings "$out/info_plist.strings"
-    install -Dm0644 programmer_dvorak_compose.keylayout "$out/programmer_dvorak_compose.keylayout"
+      install -Dm0644 info.plist "$out/info.plist"
+      install -Dm0644 version.plist "$out/version.plist"
+      install -Dm0644 resources/english.lproj/info_plist.strings "$out/info_plist.strings"
+      install -Dm0644 programmer_dvorak_compose.keylayout "$out/programmer_dvorak_compose.keylayout"
 
-    runHook postInstall
-  '';
+      runHook postInstall
+    '';
 
-  meta = {
-    description = "Programmer Dvorak keyboard layout with extra compose sequences";
-    license = lib.licenses.mit;
-    platforms = lib.platforms.darwin;
-  };
-}
+    meta = {
+      description = "Programmer Dvorak keyboard layout with extra compose sequences";
+      license = lib.licenses.mit;
+      platforms = lib.platforms.darwin;
+    };
+  }
