@@ -25,6 +25,7 @@ select = ["ALL"]
 ignore = [
     "D203",  # incompatible with D211
     "D212",  # incompatible with D213
+    "CPY001",  # LICENSE file already contains copyright notice
 ]
 
 [tool.ruff.lint.per-file-ignores]
