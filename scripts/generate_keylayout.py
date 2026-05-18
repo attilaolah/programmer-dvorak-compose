@@ -14,12 +14,12 @@ from typing import TYPE_CHECKING, TypedDict
 if TYPE_CHECKING:
     from collections.abc import Collection, Iterable, Mapping
 
-UPSTREAM_KEYLAYOUT = (
+_UPSTREAM_KEYLAYOUT = (
     "./Library/Keyboard Layouts/Programmer Dvorak.bundle/Contents/Resources/Programmer Dvorak.keylayout"
 )
 
-ACTION_PREFIX = "xkb_"
-UNICODE_KEYSYM_MIN_LENGTH = 5
+_ACTION_PREFIX = "xkb_"
+_UNICODE_KEYSYM_MIN_LENGTH = 5
 type ComposeSequence = tuple[str, ...]
 type ComposeEntry = tuple[ComposeSequence, str]
 
@@ -29,7 +29,7 @@ class _TrieNode(TypedDict):
     output: str | None
 
 
-KEYSYM_TO_CHAR = {
+_KEYSYM_TO_CHAR = {
     "space": " ",
     "exclam": "!",
     "quotedbl": '"',
@@ -75,21 +75,21 @@ KEYSYM_TO_CHAR = {
     "caron": "\u02c7",
 }
 
-KEYSYM_TO_CHAR.update({digit: digit for digit in string.digits})
+_KEYSYM_TO_CHAR.update({digit: digit for digit in string.digits})
 for codepoint in range(ord("A"), ord("Z") + 1):
     character = chr(codepoint)
-    KEYSYM_TO_CHAR[character] = character
+    _KEYSYM_TO_CHAR[character] = character
 for codepoint in range(ord("a"), ord("z") + 1):
     character = chr(codepoint)
-    KEYSYM_TO_CHAR[character] = character
+    _KEYSYM_TO_CHAR[character] = character
 
 
 def _xkb_action_id(character: str) -> str:
-    return f"{ACTION_PREFIX}{ord(character):04x}"
+    return f"{_ACTION_PREFIX}{ord(character):04x}"
 
 
 def _state_id(sequence: Iterable[str]) -> str:
-    return f"{ACTION_PREFIX}s_{'_'.join(f'{ord(character):04x}' for character in sequence)}"
+    return f"{_ACTION_PREFIX}s_{'_'.join(f'{ord(character):04x}' for character in sequence)}"
 
 
 def _xml_escape(value: str) -> str:
@@ -130,7 +130,7 @@ def _extract_upstream_keylayout(package_zip: Path) -> str:
         archive_name = next(name for name in package.namelist() if name.endswith("/Contents/Archive.pax.gz"))
         archive_bytes = package.read(archive_name)
 
-    return _extract_from_cpio(gzip.decompress(archive_bytes), UPSTREAM_KEYLAYOUT).decode("utf-8")
+    return _extract_from_cpio(gzip.decompress(archive_bytes), _UPSTREAM_KEYLAYOUT).decode("utf-8")
 
 
 def _extract_compose_source(libx11_source: Path) -> str:
@@ -141,8 +141,8 @@ def _extract_compose_source(libx11_source: Path) -> str:
         return compose_file.read().decode("utf-8")
 
 
-TOKEN_RE = re.compile(r"<([^>]+)>")
-OUTPUT_RE = re.compile(r':\s*"((?:\\.|[^"\\])*)"')
+_TOKEN_RE = re.compile(r"<([^>]+)>")
+_OUTPUT_RE = re.compile(r':\s*"((?:\\.|[^"\\])*)"')
 
 
 def _unescape_compose_string(value: str) -> str:
@@ -156,22 +156,22 @@ def _parse_compose(compose_source: str) -> list[ComposeEntry]:
         if not line.startswith("<Multi_key>"):
             continue
 
-        if (output_match := OUTPUT_RE.search(line)) is None:
+        if (output_match := _OUTPUT_RE.search(line)) is None:
             continue
 
-        tokens = TOKEN_RE.findall(line.split(":", 1)[0])
+        tokens = _TOKEN_RE.findall(line.split(":", 1)[0])
         if not tokens or tokens[0] != "Multi_key":
             continue
 
         chars: list[str] = []
         for token in tokens[1:]:
-            if token.startswith("U") and len(token) >= UNICODE_KEYSYM_MIN_LENGTH:
+            if token.startswith("U") and len(token) >= _UNICODE_KEYSYM_MIN_LENGTH:
                 try:
                     chars.append(chr(int(token[1:], 16)))
                     continue
                 except ValueError:
                     pass
-            if (char := KEYSYM_TO_CHAR.get(token)) is None:
+            if (char := _KEYSYM_TO_CHAR.get(token)) is None:
                 break
             chars.append(char)
         else:
@@ -180,14 +180,14 @@ def _parse_compose(compose_source: str) -> list[ComposeEntry]:
     return sequences
 
 
-ACTION_BLOCK_RE = re.compile(r"\n\t<action id=\"([^\"]+)\">.*?\n\t</action>", re.DOTALL)
-NONE_OUTPUT_RE = re.compile(r"<when\s+state=\"none\"\s+output=\"([^\"]*)\"")
-KEY_OUTPUT_RE = re.compile(r"(<key\b[^>\n]*?)\soutput=\"([^\"]*)\"([^>\n]*/>)")
+_ACTION_BLOCK_RE = re.compile(r"\n\t<action id=\"([^\"]+)\">.*?\n\t</action>", re.DOTALL)
+_NONE_OUTPUT_RE = re.compile(r"<when\s+state=\"none\"\s+output=\"([^\"]*)\"")
+_KEY_OUTPUT_RE = re.compile(r"(<key\b[^>\n]*?)\soutput=\"([^\"]*)\"([^>\n]*/>)")
 
 
 def _parse_original_actions(keylayout: str) -> dict[str, str]:
     actions: dict[str, str] = {}
-    for match in ACTION_BLOCK_RE.finditer(keylayout):
+    for match in _ACTION_BLOCK_RE.finditer(keylayout):
         actions[match.group(1)] = match.group(0)
     return actions
 
@@ -195,13 +195,13 @@ def _parse_original_actions(keylayout: str) -> dict[str, str]:
 def _discover_action_names(keylayout: str, original_actions: Mapping[str, str]) -> dict[str, str]:
     action_names: dict[str, str] = {}
     for action_id, block in original_actions.items():
-        if (match := NONE_OUTPUT_RE.search(block)) is None:
+        if (match := _NONE_OUTPUT_RE.search(block)) is None:
             continue
         value = _xml_unescape(match.group(1))
         if len(value) == 1 and value.isprintable():
             action_names.setdefault(value, action_id)
 
-    for match in KEY_OUTPUT_RE.finditer(keylayout):
+    for match in _KEY_OUTPUT_RE.finditer(keylayout):
         value = _xml_unescape(match.group(2))
         if len(value) == 1 and value.isprintable():
             action_names.setdefault(value, _xkb_action_id(value))
@@ -216,7 +216,7 @@ def _promote_printable_keys(keylayout: str, action_names: Mapping[str, str]) -> 
             return match.group(0)
         return f'{match.group(1)} action="{action_id}"{match.group(3)}'
 
-    return KEY_OUTPUT_RE.sub(replace, keylayout)
+    return _KEY_OUTPUT_RE.sub(replace, keylayout)
 
 
 def _filter_representable_sequences(
