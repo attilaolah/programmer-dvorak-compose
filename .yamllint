@@ -1,0 +1,11 @@
+---
+extends: default
+
+rules:
+  document-start: disable
+  indentation:
+    indent-sequences: false
+  line-length:
+    max: 119
+  truthy:
+    allowed-values: ["true", "false", "on"]

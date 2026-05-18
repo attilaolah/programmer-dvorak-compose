@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+
+    - name: Install Nix
+      uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3  # v31
+      with:
+        github_access_token: ${{ secrets.GITHUB_TOKEN }}
+        extra_nix_config: |
+          auto-optimise-store = true
+          experimental-features = nix-command flakes
+
+    - name: Check Nix flake
+      run: nix flake check
+
+    - name: Build Nix flake
+      run: nix build
+
+    - name: Check README formatting
+      run: nix run nixpkgs#prettier -- --check README.md renovate.json
+
+    - name: Check YAML formatting
+      run: nix run nixpkgs#yamllint -- .github/workflows/ci.yml
+
+    - name: Check Nix formatting
+      run: nix run nixpkgs#alejandra -- --check flake.nix home-manager.nix package.nix
+
+    - name: Check Ruff
+      run: nix run nixpkgs#ruff -- check
+
+    - name: Check Pyright
+      run: nix run nixpkgs#pyright
+
+    - name: Check ty
+      run: nix run nixpkgs#ty -- check .
+
+    - name: Check pyupgrade
+      run: |
+        nix run nixpkgs#pyupgrade -- --py314-plus scripts/*.py
+        git diff --exit-code

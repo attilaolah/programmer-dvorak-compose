@@ -1,0 +1,42 @@
+[project]
+name = "programmer-dvorak-compose"
+version = "1.2.1"
+description = "Programmer Dvorak keyboard layout with Linux-style compose key sequences"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = []
+
+# Using Flit core build backend, as described here:
+# https://flit.pypa.io/en/stable/pyproject_toml.html#build-system-section
+[build-system]
+requires = ["flit_core >=3.11,<4"]
+# https://packaging.python.org/en/latest/guides/tool-recommendations/#build-backends
+build-backend = "flit_core.buildapi"
+
+[tool.flit.module]
+name = "scripts.generate_keylayout"
+
+[tool.black]
+line-length = 119
+
+[tool.ruff.lint]
+preview = true
+select = ["ALL"]
+ignore = [
+    "D203",  # incompatible with D211
+    "D212",  # incompatible with D213
+    "CPY001",  # LICENSE file already contains copyright notice
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]  # asserts allowed in tests
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 119
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pyright]
+pythonVersion = "3.14"
+strict = ["."]

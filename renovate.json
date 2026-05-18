@@ -1,0 +1,28 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "dependencyDashboard": true,
+  "nix": {
+    "enabled": true
+  },
+  "github-actions": {
+    "pinDigests": true
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": [".*\\.nix$"],
+      "matchStrings": ["\\bpython(?<major>\\d)(?<minor>\\d+)"],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "python/cpython",
+      "currentValueTemplate": "{{major}}.{{minor}}"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Major & minor only",
+      "matchDepNames": ["python/cpython"],
+      "matchUpdateTypes": ["patch", "pin"],
+      "enabled": false
+    }
+  ]
+}
