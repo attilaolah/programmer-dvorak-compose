@@ -1,0 +1,13 @@
+---
+extends: default
+
+rules:
+  comments:
+    min-spaces-from-content: 1
+  document-start: disable
+  indentation:
+    indent-sequences: false
+  line-length:
+    max: 119
+  truthy:
+    allowed-values: ["true", "false", "on"]
