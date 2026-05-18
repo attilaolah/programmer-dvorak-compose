@@ -1,3 +1,5 @@
+"""Generate the macOS Programmer Dvorak Compose keylayout."""
+
 import argparse
 import ast
 import gzip
