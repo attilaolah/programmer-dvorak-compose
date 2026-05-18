@@ -10,7 +10,7 @@ import zipfile
 from pathlib import Path
 
 UPSTREAM_KEYLAYOUT = (
-    "./Library/Keyboard Layouts/Programmer Dvorak.bundle/Contents/Resources/" "Programmer Dvorak.keylayout"
+    "./Library/Keyboard Layouts/Programmer Dvorak.bundle/Contents/Resources/Programmer Dvorak.keylayout"
 )
 
 ACTION_PREFIX = "xkb_"
@@ -263,7 +263,7 @@ def _generate_actions(action_names, original_actions, trie):
             '\t<action id="compose">',
             '\t  <when state="none" next="compose" />',
             "\t</action>",
-        )
+        ),
     )
 
     prefixes = _collect_prefixes(trie)
@@ -282,7 +282,7 @@ def _generate_actions(action_names, original_actions, trie):
             (
                 f'\t<action id="{action_id}">',
                 f"\t  {_original_none_line(action_id, character, original_actions)}",
-            )
+            ),
         )
         for prefix, children in sorted(children_by_prefix.items()):
             child = children.get(character)
