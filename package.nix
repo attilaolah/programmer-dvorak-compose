@@ -2,7 +2,7 @@
   fetchurl,
   libx11,
   lib,
-  python3,
+  python314,
   stdenvNoCC,
 }: let
   programmerDvorakPkg = fetchurl {
@@ -17,7 +17,7 @@ stdenvNoCC.mkDerivation {
   src = ./.;
 
   nativeBuildInputs = [
-    python3
+    python314
   ];
 
   dontConfigure = true;
@@ -25,7 +25,7 @@ stdenvNoCC.mkDerivation {
   buildPhase = ''
     runHook preBuild
 
-    python3 scripts/generate_keylayout.py \
+    python3.14 scripts/generate_keylayout.py \
       --programmer-dvorak-pkg ${programmerDvorakPkg} \
       --libx11-src ${libx11.src} \
       --output programmer_dvorak_compose.keylayout

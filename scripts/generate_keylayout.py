@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import argparse
 import ast
 import gzip
@@ -18,12 +17,13 @@ UPSTREAM_KEYLAYOUT = (
 )
 
 ACTION_PREFIX = "xkb_"
+UNICODE_KEYSYM_MIN_LENGTH = 5
 type ComposeSequence = tuple[str, ...]
 type ComposeEntry = tuple[ComposeSequence, str]
 
 
-class TrieNode(TypedDict):
-    children: dict[str, TrieNode]
+class _TrieNode(TypedDict):
+    children: dict[str, _TrieNode]
     output: str | None
 
 
@@ -162,7 +162,7 @@ def _parse_compose(compose_source: str) -> list[ComposeEntry]:
 
         chars = []
         for token in tokens[1:]:
-            if token.startswith("U") and len(token) >= 5:
+            if token.startswith("U") and len(token) >= UNICODE_KEYSYM_MIN_LENGTH:
                 try:
                     chars.append(chr(int(token[1:], 16)))
                     continue
@@ -230,8 +230,8 @@ def _filter_representable_sequences(
     return representable
 
 
-def _build_trie(sequences: Mapping[ComposeSequence, str]) -> TrieNode:
-    trie: TrieNode = {"children": {}, "output": None}
+def _build_trie(sequences: Mapping[ComposeSequence, str]) -> _TrieNode:
+    trie: _TrieNode = {"children": {}, "output": None}
     for sequence, output in sequences.items():
         node = trie
         for character in sequence:
@@ -240,14 +240,14 @@ def _build_trie(sequences: Mapping[ComposeSequence, str]) -> TrieNode:
     return trie
 
 
-def _node_at(trie: TrieNode, prefix: Iterable[str]) -> TrieNode:
+def _node_at(trie: _TrieNode, prefix: Iterable[str]) -> _TrieNode:
     node = trie
     for character in prefix:
         node = node["children"][character]
     return node
 
 
-def _collect_prefixes(trie: TrieNode, prefix: ComposeSequence = ()) -> list[ComposeSequence]:
+def _collect_prefixes(trie: _TrieNode, prefix: ComposeSequence = ()) -> list[ComposeSequence]:
     prefixes: list[ComposeSequence] = []
     for character, child in trie["children"].items():
         child_prefix = (*prefix, character)
@@ -277,7 +277,7 @@ def _original_none_line(action_id: str, character: str, original_actions: Mappin
 def _generate_actions(
     action_names: Mapping[str, str],
     original_actions: Mapping[str, str],
-    trie: TrieNode,
+    trie: _TrieNode,
 ) -> str:
     lines = ["  <actions>"]
     lines.extend(
@@ -290,7 +290,7 @@ def _generate_actions(
 
     prefixes = _collect_prefixes(trie)
     state_for_prefix = {(): "compose", **{prefix: _state_id(prefix) for prefix in prefixes}}
-    children_by_prefix: dict[ComposeSequence, dict[str, TrieNode]] = {(): trie["children"]}
+    children_by_prefix: dict[ComposeSequence, dict[str, _TrieNode]] = {(): trie["children"]}
     for prefix in prefixes:
         children_by_prefix[prefix] = _node_at(trie, prefix)["children"]
 
@@ -329,7 +329,7 @@ def _generate_actions(
     return "\n".join(lines)
 
 
-def _generate_terminators(trie: TrieNode) -> str:
+def _generate_terminators(trie: _TrieNode) -> str:
     lines = ["  <terminators>", '\t<when state="compose" output="" />']
     for prefix in sorted(_collect_prefixes(trie)):
         output = _node_at(trie, prefix)["output"]
