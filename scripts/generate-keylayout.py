@@ -4,11 +4,11 @@ import ast
 import gzip
 import html
 import re
+import string
 import sys
 import tarfile
 import zipfile
 from pathlib import Path
-
 
 UPSTREAM_KEYLAYOUT = (
     "./Library/Keyboard Layouts/Programmer Dvorak.bundle/Contents/Resources/"
@@ -63,7 +63,7 @@ KEYSYM_TO_CHAR = {
     "caron": "\u02c7",
 }
 
-for digit in "0123456789":
+for digit in string.digits:
     KEYSYM_TO_CHAR[digit] = digit
 for codepoint in range(ord("A"), ord("Z") + 1):
     character = chr(codepoint)
@@ -172,7 +172,7 @@ def parse_compose(compose_source):
     return sequences
 
 
-ACTION_BLOCK_RE = re.compile(r"\n\t<action id=\"([^\"]+)\">.*?\n\t</action>", re.S)
+ACTION_BLOCK_RE = re.compile(r"\n\t<action id=\"([^\"]+)\">.*?\n\t</action>", re.DOTALL)
 NONE_OUTPUT_RE = re.compile(r"<when\s+state=\"none\"\s+output=\"([^\"]*)\"")
 KEY_OUTPUT_RE = re.compile(r"(<key\b[^>\n]*?)\soutput=\"([^\"]*)\"([^>\n]*/>)")
 
@@ -314,8 +314,8 @@ def generate_terminators(trie):
 
 
 def replace_generated_sections(keylayout, actions, terminators):
-    keylayout = re.sub(r"  <actions>.*?  </actions>", actions, keylayout, flags=re.S)
-    keylayout = re.sub(r"  <terminators>.*?  </terminators>", terminators, keylayout, flags=re.S)
+    keylayout = re.sub(r"  <actions>.*?  </actions>", actions, keylayout, flags=re.DOTALL)
+    keylayout = re.sub(r"  <terminators>.*?  </terminators>", terminators, keylayout, flags=re.DOTALL)
     return keylayout
 
 
