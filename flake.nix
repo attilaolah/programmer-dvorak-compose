@@ -29,7 +29,9 @@
       default = package;
     });
 
-    homeManagerModules.default = import ./home-manager.nix self;
-    homeManagerModules.programmer-dvorak-compose = self.homeManagerModules.default;
+    homeManagerModules = {
+      default = import ./home-manager.nix self;
+      programmer-dvorak-compose = self.homeManagerModules.default;
+    };
   };
 }
