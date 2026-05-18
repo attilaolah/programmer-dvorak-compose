@@ -8,12 +8,24 @@ import string
 import tarfile
 import zipfile
 from pathlib import Path
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from collections.abc import Collection, Iterable, Mapping
 
 UPSTREAM_KEYLAYOUT = (
     "./Library/Keyboard Layouts/Programmer Dvorak.bundle/Contents/Resources/Programmer Dvorak.keylayout"
 )
 
 ACTION_PREFIX = "xkb_"
+type ComposeSequence = tuple[str, ...]
+type ComposeEntry = tuple[ComposeSequence, str]
+
+
+class TrieNode(TypedDict):
+    children: dict[str, TrieNode]
+    output: str | None
+
 
 KEYSYM_TO_CHAR = {
     "space": " ",
@@ -70,23 +82,23 @@ for codepoint in range(ord("a"), ord("z") + 1):
     KEYSYM_TO_CHAR[character] = character
 
 
-def _xkb_action_id(character) -> str:
+def _xkb_action_id(character: str) -> str:
     return f"{ACTION_PREFIX}{ord(character):04x}"
 
 
-def _state_id(sequence) -> str:
+def _state_id(sequence: Iterable[str]) -> str:
     return f"{ACTION_PREFIX}s_{'_'.join(f'{ord(character):04x}' for character in sequence)}"
 
 
-def _xml_escape(value):
+def _xml_escape(value: str) -> str:
     return html.escape(value, quote=True)
 
 
-def _xml_unescape(value):
+def _xml_unescape(value: str) -> str:
     return html.unescape(value)
 
 
-def _extract_from_cpio(archive, wanted_name):
+def _extract_from_cpio(archive: bytes, wanted_name: str) -> bytes:
     offset = 0
     while offset + 76 <= len(archive):
         header = archive[offset : offset + 76]
@@ -111,7 +123,7 @@ def _extract_from_cpio(archive, wanted_name):
     raise FileNotFoundError(wanted_name)
 
 
-def _extract_upstream_keylayout(package_zip):
+def _extract_upstream_keylayout(package_zip: Path) -> str:
     with zipfile.ZipFile(package_zip) as package:
         archive_name = next(name for name in package.namelist() if name.endswith("/Contents/Archive.pax.gz"))
         archive_bytes = package.read(archive_name)
@@ -119,7 +131,7 @@ def _extract_upstream_keylayout(package_zip):
     return _extract_from_cpio(gzip.decompress(archive_bytes), UPSTREAM_KEYLAYOUT).decode("utf-8")
 
 
-def _extract_compose_source(libx11_source):
+def _extract_compose_source(libx11_source: Path) -> str:
     with tarfile.open(libx11_source, mode="r:*") as archive:
         compose_name = next(name for name in archive.getnames() if name.endswith("/nls/en_US.UTF-8/Compose.pre"))
         return archive.extractfile(compose_name).read().decode("utf-8")
@@ -129,12 +141,12 @@ TOKEN_RE = re.compile(r"<([^>]+)>")
 OUTPUT_RE = re.compile(r':\s*"((?:\\.|[^"\\])*)"')
 
 
-def _unescape_compose_string(value):
+def _unescape_compose_string(value: str) -> str:
     return ast.literal_eval(f'"{value}"')
 
 
-def _parse_compose(compose_source):
-    sequences = []
+def _parse_compose(compose_source: str) -> list[ComposeEntry]:
+    sequences: list[ComposeEntry] = []
     for raw_line in compose_source.splitlines():
         line = raw_line.split("#", 1)[0].strip()
         if not line.startswith("<Multi_key>"):
@@ -171,15 +183,15 @@ NONE_OUTPUT_RE = re.compile(r"<when\s+state=\"none\"\s+output=\"([^\"]*)\"")
 KEY_OUTPUT_RE = re.compile(r"(<key\b[^>\n]*?)\soutput=\"([^\"]*)\"([^>\n]*/>)")
 
 
-def _parse_original_actions(keylayout):
-    actions = {}
+def _parse_original_actions(keylayout: str) -> dict[str, str]:
+    actions: dict[str, str] = {}
     for match in ACTION_BLOCK_RE.finditer(keylayout):
         actions[match.group(1)] = match.group(0)
     return actions
 
 
-def _discover_action_names(keylayout, original_actions):
-    action_names = {}
+def _discover_action_names(keylayout: str, original_actions: Mapping[str, str]) -> dict[str, str]:
+    action_names: dict[str, str] = {}
     for action_id, block in original_actions.items():
         match = NONE_OUTPUT_RE.search(block)
         if match is None:
@@ -196,8 +208,8 @@ def _discover_action_names(keylayout, original_actions):
     return action_names
 
 
-def _promote_printable_keys(keylayout, action_names):
-    def replace(match):
+def _promote_printable_keys(keylayout: str, action_names: Mapping[str, str]) -> str:
+    def replace(match: re.Match[str]) -> str:
         value = _xml_unescape(match.group(2))
         action_id = action_names.get(value)
         if action_id is None:
@@ -207,16 +219,19 @@ def _promote_printable_keys(keylayout, action_names):
     return KEY_OUTPUT_RE.sub(replace, keylayout)
 
 
-def _filter_representable_sequences(sequences, action_names):
-    representable = {}
+def _filter_representable_sequences(
+    sequences: Iterable[ComposeEntry],
+    action_names: Collection[str],
+) -> dict[ComposeSequence, str]:
+    representable: dict[ComposeSequence, str] = {}
     for sequence, output in sequences:
         if sequence and all(character in action_names for character in sequence):
             representable.setdefault(sequence, output)
     return representable
 
 
-def _build_trie(sequences):
-    trie = {"children": {}, "output": None}
+def _build_trie(sequences: Mapping[ComposeSequence, str]) -> TrieNode:
+    trie: TrieNode = {"children": {}, "output": None}
     for sequence, output in sequences.items():
         node = trie
         for character in sequence:
@@ -225,15 +240,15 @@ def _build_trie(sequences):
     return trie
 
 
-def _node_at(trie, prefix):
+def _node_at(trie: TrieNode, prefix: Iterable[str]) -> TrieNode:
     node = trie
     for character in prefix:
         node = node["children"][character]
     return node
 
 
-def _collect_prefixes(trie, prefix=()):
-    prefixes = []
+def _collect_prefixes(trie: TrieNode, prefix: ComposeSequence = ()) -> list[ComposeSequence]:
+    prefixes: list[ComposeSequence] = []
     for character, child in trie["children"].items():
         child_prefix = (*prefix, character)
         prefixes.append(child_prefix)
@@ -241,13 +256,16 @@ def _collect_prefixes(trie, prefix=()):
     return prefixes
 
 
-def _when_line(state, output=None, next_state=None) -> str:
+def _when_line(state: str, output: str | None = None, next_state: str | None = None) -> str:
     if next_state is not None:
         return f'\t  <when state="{state}" next="{next_state}" />'
+    if output is None:
+        msg = "output is required when next_state is not set"
+        raise ValueError(msg)
     return f'\t  <when state="{state}" output="{_xml_escape(output)}" />'
 
 
-def _original_none_line(action_id, character, original_actions):
+def _original_none_line(action_id: str, character: str, original_actions: Mapping[str, str]) -> str:
     block = original_actions.get(action_id)
     if block is not None:
         match = re.search(r"\n\t  <when\s+state=\"none\".*?/>", block)
@@ -256,7 +274,11 @@ def _original_none_line(action_id, character, original_actions):
     return _when_line("none", output=character).strip()
 
 
-def _generate_actions(action_names, original_actions, trie):
+def _generate_actions(
+    action_names: Mapping[str, str],
+    original_actions: Mapping[str, str],
+    trie: TrieNode,
+) -> str:
     lines = ["  <actions>"]
     lines.extend(
         (
@@ -268,11 +290,11 @@ def _generate_actions(action_names, original_actions, trie):
 
     prefixes = _collect_prefixes(trie)
     state_for_prefix = {(): "compose", **{prefix: _state_id(prefix) for prefix in prefixes}}
-    children_by_prefix = {(): trie["children"]}
+    children_by_prefix: dict[ComposeSequence, dict[str, TrieNode]] = {(): trie["children"]}
     for prefix in prefixes:
         children_by_prefix[prefix] = _node_at(trie, prefix)["children"]
 
-    char_by_action = {}
+    char_by_action: dict[str, str] = {}
     for character, action_id in action_names.items():
         char_by_action.setdefault(action_id, character)
 
@@ -307,7 +329,7 @@ def _generate_actions(action_names, original_actions, trie):
     return "\n".join(lines)
 
 
-def _generate_terminators(trie):
+def _generate_terminators(trie: TrieNode) -> str:
     lines = ["  <terminators>", '\t<when state="compose" output="" />']
     for prefix in sorted(_collect_prefixes(trie)):
         output = _node_at(trie, prefix)["output"]
@@ -317,12 +339,12 @@ def _generate_terminators(trie):
     return "\n".join(lines)
 
 
-def _replace_generated_sections(keylayout, actions, terminators):
+def _replace_generated_sections(keylayout: str, actions: str, terminators: str) -> str:
     keylayout = re.sub(r"  <actions>.*?  </actions>", actions, keylayout, flags=re.DOTALL)
     return re.sub(r"  <terminators>.*?  </terminators>", terminators, keylayout, flags=re.DOTALL)
 
 
-def _utf16_units(value):
+def _utf16_units(value: str) -> int:
     return len(value.encode("utf-16-le")) // 2
 
 
