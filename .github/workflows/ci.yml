@@ -32,6 +32,15 @@ jobs:
     - name: Build Nix flake
       run: nix build
 
+    - name: Check README formatting
+      run: nix run nixpkgs#prettier -- --check README.md renovate.json
+
+    - name: Check YAML formatting
+      run: nix run nixpkgs#yamllint -- .github/workflows/ci.yml
+
+    - name: Check Nix formatting
+      run: nix run nixpkgs#alejandra -- --check flake.nix home-manager.nix package.nix
+
     - name: Check Ruff
       run: nix run nixpkgs#ruff -- check
 
