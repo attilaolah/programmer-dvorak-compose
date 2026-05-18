@@ -2,37 +2,43 @@ name: CI
 
 on:
   pull_request:
+    branches: ["main"]
   push:
-    branches:
-      - main
+    branches: ["main"]
+  workflow_dispatch:
 
 jobs:
   check:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+    - name: Checkout
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Install Nix
-        uses: cachix/install-nix-action@v31
+    - name: Install Nix
+      uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+      with:
+        github_access_token: ${{ secrets.GITHUB_TOKEN }}
+        extra_nix_config: |
+          auto-optimise-store = true
+          experimental-features = nix-command flakes
 
-      - name: Nix flake check
-        run: nix flake check
+    - name: Check Nix flake
+      run: nix flake check
 
-      - name: Nix flake build
-        run: nix build
+    - name: Build Nix flake
+      run: nix build
 
-      - name: Ruff
-        run: nix run nixpkgs#ruff -- check
+    - name: Check Ruff
+      run: nix run nixpkgs#ruff -- check
 
-      - name: Pyright
-        run: nix run nixpkgs#pyright
+    - name: Check Pyright
+      run: nix run nixpkgs#pyright
 
-      - name: Ty
-        run: nix run nixpkgs#ty -- check .
+    - name: Check ty
+      run: nix run nixpkgs#ty -- check .
 
-      - name: Pyupgrade
-        run: |
-          nix run nixpkgs#pyupgrade -- --py314-plus scripts/*.py
-          git diff --exit-code
+    - name: Check pyupgrade
+      run: |
+        nix run nixpkgs#pyupgrade -- --py314-plus scripts/*.py
+        git diff --exit-code
