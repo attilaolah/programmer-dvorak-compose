@@ -202,10 +202,32 @@ def _unescape_compose_string(value: str) -> str:
     return ast.literal_eval(f'"{value}"')
 
 
+def _strip_compose_comment(raw_line: str) -> str:
+    quote: str | None = None
+    escaped = False
+    for index, character in enumerate(raw_line):
+        if escaped:
+            escaped = False
+            continue
+        if quote is not None:
+            if character == "\\":
+                escaped = True
+                continue
+            if character == quote:
+                quote = None
+            continue
+        if character in {'"', "'"}:
+            quote = character
+            continue
+        if character == "#":
+            return raw_line[:index].strip()
+    return raw_line.strip()
+
+
 def _parse_compose(compose_source: str) -> list[ComposeEntry]:
     sequences: list[ComposeEntry] = []
     for raw_line in compose_source.splitlines():
-        line = raw_line.split("#", 1)[0].strip()
+        line = _strip_compose_comment(raw_line)
         if not line.startswith("<Multi_key>"):
             continue
 

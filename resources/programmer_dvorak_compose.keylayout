@@ -1439,7 +1439,7 @@
 	<when state="breve" 		output="&#x02D8;" />
 	<when state="dot"			output="&#x02D9;" />
 	<when state="alig"			output="a" />
-	<when state="eth"			output="d" />
+	<when state="eth"			output="e" />
 	<when state="tuttel"			output="t" />
 	<when state="ssharp"		output="s" />
 	<when state="less"			output="&#x3C;" />
