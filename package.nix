@@ -47,6 +47,6 @@ in
     meta = {
       description = "Programmer Dvorak keyboard layout with extra compose sequences";
       license = lib.licenses.mit;
-      platforms = lib.platforms.darwin;
+      platforms = lib.platforms.unix;
     };
   }
