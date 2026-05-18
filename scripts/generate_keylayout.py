@@ -136,8 +136,7 @@ def _extract_upstream_keylayout(package_zip: Path) -> str:
 def _extract_compose_source(libx11_source: Path) -> str:
     with tarfile.open(libx11_source, mode="r:*") as archive:
         compose_name = next(name for name in archive.getnames() if name.endswith("/nls/en_US.UTF-8/Compose.pre"))
-        compose_file = archive.extractfile(compose_name)
-        if compose_file is None:
+        if (compose_file := archive.extractfile(compose_name)) is None:
             raise FileNotFoundError(compose_name)
         return compose_file.read().decode("utf-8")
 
@@ -157,8 +156,7 @@ def _parse_compose(compose_source: str) -> list[ComposeEntry]:
         if not line.startswith("<Multi_key>"):
             continue
 
-        output_match = OUTPUT_RE.search(line)
-        if output_match is None:
+        if (output_match := OUTPUT_RE.search(line)) is None:
             continue
 
         tokens = TOKEN_RE.findall(line.split(":", 1)[0])
@@ -173,8 +171,7 @@ def _parse_compose(compose_source: str) -> list[ComposeEntry]:
                     continue
                 except ValueError:
                     pass
-            char = KEYSYM_TO_CHAR.get(token)
-            if char is None:
+            if (char := KEYSYM_TO_CHAR.get(token)) is None:
                 break
             chars.append(char)
         else:
@@ -198,8 +195,7 @@ def _parse_original_actions(keylayout: str) -> dict[str, str]:
 def _discover_action_names(keylayout: str, original_actions: Mapping[str, str]) -> dict[str, str]:
     action_names: dict[str, str] = {}
     for action_id, block in original_actions.items():
-        match = NONE_OUTPUT_RE.search(block)
-        if match is None:
+        if (match := NONE_OUTPUT_RE.search(block)) is None:
             continue
         value = _xml_unescape(match.group(1))
         if len(value) == 1 and value.isprintable():
@@ -216,8 +212,7 @@ def _discover_action_names(keylayout: str, original_actions: Mapping[str, str]) 
 def _promote_printable_keys(keylayout: str, action_names: Mapping[str, str]) -> str:
     def replace(match: re.Match[str]) -> str:
         value = _xml_unescape(match.group(2))
-        action_id = action_names.get(value)
-        if action_id is None:
+        if (action_id := action_names.get(value)) is None:
             return match.group(0)
         return f'{match.group(1)} action="{action_id}"{match.group(3)}'
 
@@ -312,8 +307,7 @@ def _generate_actions(
             ),
         )
         for prefix, children in sorted(children_by_prefix.items()):
-            child = children.get(character)
-            if child is None:
+            if (child := children.get(character)) is None:
                 continue
 
             child_prefix = (*prefix, character)
