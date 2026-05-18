@@ -91,7 +91,8 @@ class _TrieNode(TypedDict):
     output: str | None
 
 
-def _main() -> None:
+def main() -> None:
+    """Generate the keylayout file from the command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--programmer-dvorak-pkg", required=True, type=Path)
     parser.add_argument("--libx11-src", required=True, type=Path)
@@ -418,4 +419,4 @@ def _utf16_units(value: str) -> int:
 
 
 if __name__ == "__main__":
-    _main()
+    main()
