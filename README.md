@@ -1,13 +1,13 @@
 # programmer-dvorak-compose
 
-Fork of Roland Kaufmann's macOS DVP keyboard layout, with additional compose key sequences.
+Fork of Roland Kaufmann's macOS DVP keyboard layout, with Linux-style compose key sequences.
 
-The layout currently adds Hungarian double acute compose sequences:
+The packaged `.keylayout` is generated at build time from:
 
-- `=o` -> `ő`
-- `=O` -> `Ő`
-- `=u` -> `ű`
-- `=U` -> `Ű`
+- Roland Kaufmann's original Programmer Dvorak macOS package.
+- libX11's `en_US.UTF-8/Compose.pre`, which is the default Compose table used by X11 on Linux.
+
+The generator keeps the original DVP key maps, promotes printable key outputs into macOS keylayout actions, and emits the representable `Multi_key` compose sequences from the X11 source.
 
 ## Nix
 
