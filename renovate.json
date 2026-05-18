@@ -11,9 +11,7 @@
     {
       "customType": "regex",
       "fileMatch": [".*\\.nix$"],
-      "matchStrings": [
-        "\\bpython(?<major>\\d)(?<minor>\\d+)"
-      ],
+      "matchStrings": ["\\bpython(?<major>\\d)(?<minor>\\d+)"],
       "datasourceTemplate": "github-tags",
       "depNameTemplate": "python/cpython",
       "currentValueTemplate": "{{major}}.{{minor}}"
