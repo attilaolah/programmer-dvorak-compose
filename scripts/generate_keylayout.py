@@ -136,7 +136,10 @@ def _extract_upstream_keylayout(package_zip: Path) -> str:
 def _extract_compose_source(libx11_source: Path) -> str:
     with tarfile.open(libx11_source, mode="r:*") as archive:
         compose_name = next(name for name in archive.getnames() if name.endswith("/nls/en_US.UTF-8/Compose.pre"))
-        return archive.extractfile(compose_name).read().decode("utf-8")
+        compose_file = archive.extractfile(compose_name)
+        if compose_file is None:
+            raise FileNotFoundError(compose_name)
+        return compose_file.read().decode("utf-8")
 
 
 TOKEN_RE = re.compile(r"<([^>]+)>")
@@ -162,7 +165,7 @@ def _parse_compose(compose_source: str) -> list[ComposeEntry]:
         if not tokens or tokens[0] != "Multi_key":
             continue
 
-        chars = []
+        chars: list[str] = []
         for token in tokens[1:]:
             if token.startswith("U") and len(token) >= UNICODE_KEYSYM_MIN_LENGTH:
                 try:
