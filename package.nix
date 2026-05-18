@@ -25,7 +25,7 @@ stdenvNoCC.mkDerivation {
   buildPhase = ''
     runHook preBuild
 
-    python3 scripts/generate-keylayout.py \
+    python3 scripts/generate_keylayout.py \
       --programmer-dvorak-pkg ${programmerDvorakPkg} \
       --libx11-src ${libx11.src} \
       --output programmer_dvorak_compose.keylayout
