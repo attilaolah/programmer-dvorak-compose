@@ -38,4 +38,5 @@ max-line-length = 119
 convention = "google"
 
 [tool.pyright]
+pythonVersion = "3.14"
 strict = ["."]
