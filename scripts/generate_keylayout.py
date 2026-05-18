@@ -20,14 +20,11 @@ _UPSTREAM_KEYLAYOUT = (
 
 _ACTION_PREFIX = "xkb_"
 _UNICODE_KEYSYM_MIN_LENGTH = 5
-type ComposeSequence = tuple[str, ...]
-type ComposeEntry = tuple[ComposeSequence, str]
-
-
-class _TrieNode(TypedDict):
-    children: dict[str, _TrieNode]
-    output: str | None
-
+_TOKEN_RE = re.compile(r"<([^>]+)>")
+_OUTPUT_RE = re.compile(r':\s*"((?:\\.|[^"\\])*)"')
+_ACTION_BLOCK_RE = re.compile(r"\n\t<action id=\"([^\"]+)\">.*?\n\t</action>", re.DOTALL)
+_NONE_OUTPUT_RE = re.compile(r"<when\s+state=\"none\"\s+output=\"([^\"]*)\"")
+_KEY_OUTPUT_RE = re.compile(r"(<key\b[^>\n]*?)\soutput=\"([^\"]*)\"([^>\n]*/>)")
 
 _KEYSYM_TO_CHAR = {
     "space": " ",
@@ -82,6 +79,49 @@ for codepoint in range(ord("A"), ord("Z") + 1):
 for codepoint in range(ord("a"), ord("z") + 1):
     character = chr(codepoint)
     _KEYSYM_TO_CHAR[character] = character
+
+
+type ComposeSequence = tuple[str, ...]
+type ComposeEntry = tuple[ComposeSequence, str]
+
+
+class _TrieNode(TypedDict):
+    children: dict[str, _TrieNode]
+    output: str | None
+
+
+def _main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--programmer-dvorak-pkg", required=True, type=Path)
+    parser.add_argument("--libx11-src", required=True, type=Path)
+    parser.add_argument("--output", required=True, type=Path)
+    args = parser.parse_args()
+
+    keylayout = _extract_upstream_keylayout(args.programmer_dvorak_pkg)
+    original_actions = _parse_original_actions(keylayout)
+    action_names = _discover_action_names(keylayout, original_actions)
+
+    compose_source = _extract_compose_source(args.libx11_src)
+    sequences = _filter_representable_sequences(_parse_compose(compose_source), action_names)
+    trie = _build_trie(sequences)
+
+    keylayout = _promote_printable_keys(keylayout, action_names)
+    keylayout = re.sub(
+        r'<keyboard group="0" id="[^"]+" name="[^"]+" maxout="[^"]+">',
+        (
+            '<keyboard group="0" id="6455" name="Programmer Dvorak Compose" '
+            f'maxout="{max([1, *(_utf16_units(output) for output in sequences.values())])}">'
+        ),
+        keylayout,
+        count=1,
+    )
+    keylayout = _replace_generated_sections(
+        keylayout,
+        _generate_actions(action_names, original_actions, trie),
+        _generate_terminators(trie),
+    )
+
+    args.output.write_text(keylayout, encoding="utf-8")
 
 
 def _xkb_action_id(character: str) -> str:
@@ -141,10 +181,6 @@ def _extract_compose_source(libx11_source: Path) -> str:
         return compose_file.read().decode("utf-8")
 
 
-_TOKEN_RE = re.compile(r"<([^>]+)>")
-_OUTPUT_RE = re.compile(r':\s*"((?:\\.|[^"\\])*)"')
-
-
 def _unescape_compose_string(value: str) -> str:
     return ast.literal_eval(f'"{value}"')
 
@@ -178,11 +214,6 @@ def _parse_compose(compose_source: str) -> list[ComposeEntry]:
             sequences.append((tuple(chars), _unescape_compose_string(output_match.group(1))))
 
     return sequences
-
-
-_ACTION_BLOCK_RE = re.compile(r"\n\t<action id=\"([^\"]+)\">.*?\n\t</action>", re.DOTALL)
-_NONE_OUTPUT_RE = re.compile(r"<when\s+state=\"none\"\s+output=\"([^\"]*)\"")
-_KEY_OUTPUT_RE = re.compile(r"(<key\b[^>\n]*?)\soutput=\"([^\"]*)\"([^>\n]*/>)")
 
 
 def _parse_original_actions(keylayout: str) -> dict[str, str]:
@@ -345,40 +376,6 @@ def _replace_generated_sections(keylayout: str, actions: str, terminators: str) 
 
 def _utf16_units(value: str) -> int:
     return len(value.encode("utf-16-le")) // 2
-
-
-def _main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--programmer-dvorak-pkg", required=True, type=Path)
-    parser.add_argument("--libx11-src", required=True, type=Path)
-    parser.add_argument("--output", required=True, type=Path)
-    args = parser.parse_args()
-
-    keylayout = _extract_upstream_keylayout(args.programmer_dvorak_pkg)
-    original_actions = _parse_original_actions(keylayout)
-    action_names = _discover_action_names(keylayout, original_actions)
-
-    compose_source = _extract_compose_source(args.libx11_src)
-    sequences = _filter_representable_sequences(_parse_compose(compose_source), action_names)
-    trie = _build_trie(sequences)
-
-    keylayout = _promote_printable_keys(keylayout, action_names)
-    keylayout = re.sub(
-        r'<keyboard group="0" id="[^"]+" name="[^"]+" maxout="[^"]+">',
-        (
-            '<keyboard group="0" id="6455" name="Programmer Dvorak Compose" '
-            f'maxout="{max([1, *(_utf16_units(output) for output in sequences.values())])}">'
-        ),
-        keylayout,
-        count=1,
-    )
-    keylayout = _replace_generated_sections(
-        keylayout,
-        _generate_actions(action_names, original_actions, trie),
-        _generate_terminators(trie),
-    )
-
-    args.output.write_text(keylayout, encoding="utf-8")
 
 
 if __name__ == "__main__":
