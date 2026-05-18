@@ -5,14 +5,12 @@ import gzip
 import html
 import re
 import string
-import sys
 import tarfile
 import zipfile
 from pathlib import Path
 
 UPSTREAM_KEYLAYOUT = (
-    "./Library/Keyboard Layouts/Programmer Dvorak.bundle/Contents/Resources/"
-    "Programmer Dvorak.keylayout"
+    "./Library/Keyboard Layouts/Programmer Dvorak.bundle/Contents/Resources/" "Programmer Dvorak.keylayout"
 )
 
 ACTION_PREFIX = "xkb_"
@@ -63,8 +61,7 @@ KEYSYM_TO_CHAR = {
     "caron": "\u02c7",
 }
 
-for digit in string.digits:
-    KEYSYM_TO_CHAR[digit] = digit
+KEYSYM_TO_CHAR.update({digit: digit for digit in string.digits})
 for codepoint in range(ord("A"), ord("Z") + 1):
     character = chr(codepoint)
     KEYSYM_TO_CHAR[character] = character
@@ -73,11 +70,11 @@ for codepoint in range(ord("a"), ord("z") + 1):
     KEYSYM_TO_CHAR[character] = character
 
 
-def xkb_action_id(character):
+def xkb_action_id(character) -> str:
     return f"{ACTION_PREFIX}{ord(character):04x}"
 
 
-def state_id(sequence):
+def state_id(sequence) -> str:
     return f"{ACTION_PREFIX}s_{'_'.join(f'{ord(character):04x}' for character in sequence)}"
 
 
@@ -95,7 +92,8 @@ def extract_from_cpio(archive, wanted_name):
         header = archive[offset : offset + 76]
         offset += 76
         if header[:6] != b"070707":
-            raise ValueError("unsupported cpio archive format")
+            msg = "unsupported cpio archive format"
+            raise ValueError(msg)
 
         name_size = int(header[59:65], 8)
         file_size = int(header[65:76], 8)
@@ -115,9 +113,7 @@ def extract_from_cpio(archive, wanted_name):
 
 def extract_upstream_keylayout(package_zip):
     with zipfile.ZipFile(package_zip) as package:
-        archive_name = next(
-            name for name in package.namelist() if name.endswith("/Contents/Archive.pax.gz")
-        )
+        archive_name = next(name for name in package.namelist() if name.endswith("/Contents/Archive.pax.gz"))
         archive_bytes = package.read(archive_name)
 
     return extract_from_cpio(gzip.decompress(archive_bytes), UPSTREAM_KEYLAYOUT).decode("utf-8")
@@ -125,9 +121,7 @@ def extract_upstream_keylayout(package_zip):
 
 def extract_compose_source(libx11_source):
     with tarfile.open(libx11_source, mode="r:*") as archive:
-        compose_name = next(
-            name for name in archive.getnames() if name.endswith("/nls/en_US.UTF-8/Compose.pre")
-        )
+        compose_name = next(name for name in archive.getnames() if name.endswith("/nls/en_US.UTF-8/Compose.pre"))
         return archive.extractfile(compose_name).read().decode("utf-8")
 
 
@@ -241,13 +235,13 @@ def node_at(trie, prefix):
 def collect_prefixes(trie, prefix=()):
     prefixes = []
     for character, child in trie["children"].items():
-        child_prefix = prefix + (character,)
+        child_prefix = (*prefix, character)
         prefixes.append(child_prefix)
         prefixes.extend(collect_prefixes(child, child_prefix))
     return prefixes
 
 
-def when_line(state, output=None, next_state=None):
+def when_line(state, output=None, next_state=None) -> str:
     if next_state is not None:
         return f'\t  <when state="{state}" next="{next_state}" />'
     return f'\t  <when state="{state}" output="{xml_escape(output)}" />'
@@ -264,9 +258,13 @@ def original_none_line(action_id, character, original_actions):
 
 def generate_actions(action_names, original_actions, trie):
     lines = ["  <actions>"]
-    lines.append('\t<action id="compose">')
-    lines.append('\t  <when state="none" next="compose" />')
-    lines.append("\t</action>")
+    lines.extend(
+        (
+            '\t<action id="compose">',
+            '\t  <when state="none" next="compose" />',
+            "\t</action>",
+        )
+    )
 
     prefixes = collect_prefixes(trie)
     state_for_prefix = {(): "compose", **{prefix: state_id(prefix) for prefix in prefixes}}
@@ -280,14 +278,18 @@ def generate_actions(action_names, original_actions, trie):
 
     for action_id in sorted(char_by_action):
         character = char_by_action[action_id]
-        lines.append(f'\t<action id="{action_id}">')
-        lines.append(f"\t  {original_none_line(action_id, character, original_actions)}")
+        lines.extend(
+            (
+                f'\t<action id="{action_id}">',
+                f"\t  {original_none_line(action_id, character, original_actions)}",
+            )
+        )
         for prefix, children in sorted(children_by_prefix.items()):
             child = children.get(character)
             if child is None:
                 continue
 
-            child_prefix = prefix + (character,)
+            child_prefix = (*prefix, character)
             if child["children"]:
                 lines.append(when_line(state_for_prefix[prefix], next_state=state_for_prefix[child_prefix]))
             else:
@@ -295,9 +297,11 @@ def generate_actions(action_names, original_actions, trie):
         lines.append("\t</action>")
 
     used_action_ids = set(char_by_action) | {"compose"}
-    for action_id in sorted(original_actions):
-        if action_id not in used_action_ids:
-            lines.append(original_actions[action_id].lstrip("\n"))
+    lines.extend(
+        original_actions[action_id].lstrip("\n")
+        for action_id in sorted(original_actions)
+        if action_id not in used_action_ids
+    )
 
     lines.append("  </actions>")
     return "\n".join(lines)
@@ -315,15 +319,14 @@ def generate_terminators(trie):
 
 def replace_generated_sections(keylayout, actions, terminators):
     keylayout = re.sub(r"  <actions>.*?  </actions>", actions, keylayout, flags=re.DOTALL)
-    keylayout = re.sub(r"  <terminators>.*?  </terminators>", terminators, keylayout, flags=re.DOTALL)
-    return keylayout
+    return re.sub(r"  <terminators>.*?  </terminators>", terminators, keylayout, flags=re.DOTALL)
 
 
 def utf16_units(value):
     return len(value.encode("utf-16-le")) // 2
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--programmer-dvorak-pkg", required=True, type=Path)
     parser.add_argument("--libx11-src", required=True, type=Path)
@@ -355,7 +358,6 @@ def main():
     )
 
     args.output.write_text(keylayout, encoding="utf-8")
-    print(f"Generated {len(sequences)} compose sequences", file=sys.stderr)
 
 
 if __name__ == "__main__":
