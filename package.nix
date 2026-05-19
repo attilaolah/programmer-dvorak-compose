@@ -49,7 +49,6 @@ in
       mkdir KeyboardAlt.iconset
       sed 's/fill="currentColor"/fill="#fff"/' resources/keyboard_alt.svg > KeyboardAlt.svg
       rsvg-convert -w 16 -h 16 KeyboardAlt.svg -o KeyboardAlt.iconset/icon_16x16.png
-      rsvg-convert -w 32 -h 32 KeyboardAlt.svg -o KeyboardAlt.iconset/icon_16x16@2x.png
       rsvg-convert -w 32 -h 32 KeyboardAlt.svg -o KeyboardAlt.iconset/icon_32x32.png
       rsvg-convert -w 64 -h 64 KeyboardAlt.svg -o KeyboardAlt.iconset/icon_32x32@2x.png
       rsvg-convert -w 128 -h 128 KeyboardAlt.svg -o KeyboardAlt.iconset/icon_128x128.png
@@ -57,6 +56,7 @@ in
       png2icns "Programmer Dvorak Compose.icns" \
         KeyboardAlt.iconset/icon_16x16.png \
         KeyboardAlt.iconset/icon_32x32.png \
+        KeyboardAlt.iconset/icon_32x32@2x.png \
         KeyboardAlt.iconset/icon_128x128.png \
         KeyboardAlt.iconset/icon_128x128@2x.png
 
