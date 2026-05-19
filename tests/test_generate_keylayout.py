@@ -1,5 +1,5 @@
 """Tests for the macOS keylayout generator."""
-# ruff: noqa: DOC501, S314, S405
+# ruff: noqa: S314, S405
 
 from __future__ import annotations
 
@@ -124,9 +124,7 @@ def key_action_refs(root: ET.Element) -> list[str]:
 def action_for_key_code(root: ET.Element, code: str) -> str:
     """Return the action ID used by a key code."""
     key = root.find(f'.//key[@code="{code}"]')
-    if key is None:
-        msg = f"missing key code {code}"
-        raise AssertionError(msg)
+    assert key is not None, f"missing key code {code}"
     return key.attrib["action"]
 
 
@@ -154,15 +152,16 @@ def assert_compose_output(root: ET.Element, sequence: tuple[str, ...], output: s
     }
     whens = action_when_by_state(root)
     state = "compose"
+    actual_output: str | None = None
     for character in sequence:
         when = whens[key_actions[character]][state]
         if "output" in when.attrib:
             assert character == sequence[-1]
-            assert when.attrib["output"] == output
-            return
+            actual_output = when.attrib["output"]
+            break
         state = when.attrib["next"]
-    msg = f"sequence {sequence!r} did not terminate"
-    raise AssertionError(msg)
+
+    assert actual_output == output, f"sequence {sequence!r}"
 
 
 def test_generated_fixture_is_parseable_xml() -> None:
