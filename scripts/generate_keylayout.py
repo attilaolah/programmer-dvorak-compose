@@ -21,11 +21,16 @@ _UPSTREAM_KEYLAYOUT = (
 _ACTION_PREFIX = "xkb_"
 _INDENT_SPACES_PER_TAB = 2
 _UNICODE_KEYSYM_MIN_LENGTH = 5
+_PREFERRED_SYNTHETIC_ACTION_IDS = {
+    "=": "doubleacute",
+}
 _TOKEN_RE = re.compile(r"<([^>]+)>")
 _OUTPUT_RE = re.compile(r':\s*"((?:\\.|[^"\\])*)"')
-_ACTION_BLOCK_RE = re.compile(r"\n\t<action id=\"([^\"]+)\">.*?\n\t</action>", re.DOTALL)
-_NONE_OUTPUT_RE = re.compile(r"<when\s+state=\"none\"\s+output=\"([^\"]*)\"")
+_ACTION_BLOCK_RE = re.compile(r"\n[ \t]*<action id=\"([^\"]+)\">(.*?)\n[ \t]*</action>", re.DOTALL)
+_WHEN_RE = re.compile(r"<when\b(.*?)/>")
+_ATTR_RE = re.compile(r'\b(state|next|output)="([^"]*)"')
 _KEY_OUTPUT_RE = re.compile(r"(<key\b[^>\n]*?)\soutput=\"([^\"]*)\"([^>\n]*/>)")
+_ACTIONS_END_RE = re.compile(r"\n[ \t]*</actions>")
 
 _KEYSYM_TO_CHAR = {
     "space": " ",
@@ -100,14 +105,18 @@ def main() -> None:
     args = parser.parse_args()
 
     keylayout = _extract_upstream_keylayout(args.programmer_dvorak_pkg)
+    compose_source = _extract_compose_source(args.libx11_src)
     original_actions = _parse_original_actions(keylayout)
     action_names = _discover_action_names(keylayout, original_actions)
-
-    compose_source = _extract_compose_source(args.libx11_src)
     sequences = _filter_representable_sequences(_parse_compose(compose_source), action_names)
     trie = _build_trie(sequences)
 
     keylayout = _promote_printable_keys(keylayout, action_names)
+    keylayout = _insert_generated_passthrough_actions(
+        keylayout,
+        _generated_passthrough_characters(action_names, original_actions),
+    )
+    keylayout = _inject_generated_transitions(keylayout, _generate_transition_additions(action_names, trie))
     keylayout = re.sub(
         r'<keyboard group="0" id="[^"]+" name="[^"]+" maxout="[^"]+">',
         (
@@ -117,11 +126,6 @@ def main() -> None:
         keylayout,
         count=1,
     )
-    keylayout = _replace_generated_sections(
-        keylayout,
-        _generate_actions(action_names, original_actions, trie),
-        _generate_terminators(trie),
-    )
 
     args.output.write_text(_normalize_leading_indentation(keylayout), encoding="utf-8")
 
@@ -130,12 +134,22 @@ def _xkb_action_id(character: str) -> str:
     return f"{_ACTION_PREFIX}{ord(character):04x}"
 
 
+def _synthetic_action_id(character: str) -> str:
+    return _PREFERRED_SYNTHETIC_ACTION_IDS.get(character, _xkb_action_id(character))
+
+
 def _state_id(sequence: Iterable[str]) -> str:
     return f"{_ACTION_PREFIX}s_{'_'.join(f'{ord(character):04x}' for character in sequence)}"
 
 
 def _xml_escape(value: str) -> str:
-    return html.escape(value, quote=True)
+    replacements = {
+        "&": "&#x26;",
+        '"': "&#x22;",
+        "<": "&#x3C;",
+        ">": "&#x3E;",
+    }
+    return "".join(replacements.get(character, character) for character in value)
 
 
 def _xml_unescape(value: str) -> str:
@@ -145,16 +159,21 @@ def _xml_unescape(value: str) -> str:
 def _normalize_leading_indentation(text: str) -> str:
     lines: list[str] = []
     for line in text.splitlines(keepends=True):
+        line_ending = "\n" if line.endswith("\n") else ""
         content = line.lstrip(" \t")
         leading = line[: len(line) - len(content)]
+        normalized_content = content.replace("\t", "  ")
         if not leading:
-            lines.append(line)
+            lines.append(f"{normalized_content.rstrip()}{line_ending}")
+            continue
+        if not normalized_content.rstrip():
+            lines.append(line_ending)
             continue
 
         spaces = leading.count(" ")
         tabs = leading.count("\t")
         indent = tabs + (spaces + _INDENT_SPACES_PER_TAB - 1) // _INDENT_SPACES_PER_TAB
-        lines.append(f"{'\t' * indent}{content}")
+        lines.append(f"{' ' * (_INDENT_SPACES_PER_TAB * indent)}{normalized_content.rstrip()}{line_ending}")
     return "".join(lines)
 
 
@@ -259,23 +278,21 @@ def _parse_compose(compose_source: str) -> list[ComposeEntry]:
 def _parse_original_actions(keylayout: str) -> dict[str, str]:
     actions: dict[str, str] = {}
     for match in _ACTION_BLOCK_RE.finditer(keylayout):
-        actions[match.group(1)] = match.group(0)
+        actions[match.group(1)] = match.group(2)
     return actions
 
 
 def _discover_action_names(keylayout: str, original_actions: Mapping[str, str]) -> dict[str, str]:
     action_names: dict[str, str] = {}
-    for action_id, block in original_actions.items():
-        if (match := _NONE_OUTPUT_RE.search(block)) is None:
-            continue
-        value = _xml_unescape(match.group(1))
-        if len(value) == 1 and value.isprintable():
-            action_names.setdefault(value, action_id)
+    terminators = _terminator_outputs(keylayout)
+    for action_id, body in original_actions.items():
+        if (character := _action_character(action_id, body, terminators)) is not None:
+            action_names.setdefault(character, action_id)
 
     for match in _KEY_OUTPUT_RE.finditer(keylayout):
         value = _xml_unescape(match.group(2))
         if len(value) == 1 and value.isprintable():
-            action_names.setdefault(value, _xkb_action_id(value))
+            action_names.setdefault(value, _synthetic_action_id(value))
 
     return action_names
 
@@ -288,6 +305,31 @@ def _promote_printable_keys(keylayout: str, action_names: Mapping[str, str]) -> 
         return f'{match.group(1)} action="{action_id}"{match.group(3)}'
 
     return _KEY_OUTPUT_RE.sub(replace, keylayout)
+
+
+def _generated_passthrough_characters(
+    action_names: Mapping[str, str],
+    original_actions: Mapping[str, str],
+) -> dict[str, str]:
+    existing_action_ids = set(original_actions)
+    return {
+        action_id: character
+        for character, action_id in action_names.items()
+        if action_id == _synthetic_action_id(character) and action_id not in existing_action_ids
+    }
+
+
+def _insert_generated_passthrough_actions(keylayout: str, characters_by_action: Mapping[str, str]) -> str:
+    if not characters_by_action:
+        return keylayout
+
+    action_blocks = [
+        f'\t<action id="{action_id}">\n'
+        f'\t  <when state="none" output="{_xml_escape(character)}" />\n'
+        "\t</action>"
+        for action_id, character in sorted(characters_by_action.items())
+    ]
+    return _ACTIONS_END_RE.sub("\n" + "\n".join(action_blocks) + "\n  </actions>", keylayout, count=1)
 
 
 def _filter_representable_sequences(
@@ -336,82 +378,100 @@ def _when_line(state: str, output: str | None = None, next_state: str | None = N
     return f'\t  <when state="{state}" output="{_xml_escape(output)}" />'
 
 
-def _original_none_line(action_id: str, character: str, original_actions: Mapping[str, str]) -> str:
-    block = original_actions.get(action_id)
-    if block is not None:
-        match = re.search(r"\n\t  <when\s+state=\"none\".*?/>", block)
-        if match is not None:
-            return match.group(0).strip()
-    return _when_line("none", output=character).strip()
-
-
-def _generate_actions(
-    action_names: Mapping[str, str],
-    original_actions: Mapping[str, str],
-    trie: _TrieNode,
-) -> str:
-    lines = ["  <actions>"]
-    lines.extend(
-        (
-            '\t<action id="compose">',
-            '\t  <when state="none" next="compose" />',
-            "\t</action>",
-        ),
-    )
-
+def _generate_transition_additions(action_names: Mapping[str, str], trie: _TrieNode) -> dict[str, list[str]]:
     prefixes = _collect_prefixes(trie)
     state_for_prefix = {(): "compose", **{prefix: _state_id(prefix) for prefix in prefixes}}
     children_by_prefix: dict[ComposeSequence, dict[str, _TrieNode]] = {(): trie["children"]}
     for prefix in prefixes:
         children_by_prefix[prefix] = _node_at(trie, prefix)["children"]
 
-    char_by_action: dict[str, str] = {}
+    additions: dict[str, list[str]] = {}
     for character, action_id in action_names.items():
-        char_by_action.setdefault(action_id, character)
-
-    for action_id in sorted(char_by_action):
-        character = char_by_action[action_id]
-        lines.extend(
-            (
-                f'\t<action id="{action_id}">',
-                f"\t  {_original_none_line(action_id, character, original_actions)}",
-            ),
-        )
         for prefix, children in sorted(children_by_prefix.items()):
             if (child := children.get(character)) is None:
                 continue
 
             child_prefix = (*prefix, character)
             if child["children"]:
-                lines.append(_when_line(state_for_prefix[prefix], next_state=state_for_prefix[child_prefix]))
+                line = _when_line(state_for_prefix[prefix], next_state=state_for_prefix[child_prefix])
             else:
-                lines.append(_when_line(state_for_prefix[prefix], output=child["output"]))
-        lines.append("\t</action>")
+                line = _when_line(state_for_prefix[prefix], output=child["output"])
+            additions.setdefault(action_id, []).append(line)
 
-    used_action_ids = set(char_by_action) | {"compose"}
-    lines.extend(
-        original_actions[action_id].lstrip("\n")
-        for action_id in sorted(original_actions)
-        if action_id not in used_action_ids
+    return additions
+
+
+def _attrs(raw: str) -> dict[str, str]:
+    return dict(_ATTR_RE.findall(raw))
+
+
+def _terminator_outputs(keylayout: str) -> dict[str, str]:
+    match = re.search(r"\n[ \t]*<terminators>.*?\n[ \t]*</terminators>", keylayout, flags=re.DOTALL)
+    if match is None:
+        return {}
+    return {
+        parsed["state"]: _xml_unescape(parsed.get("output", ""))
+        for when_match in _WHEN_RE.finditer(match.group(0))
+        if "state" in (parsed := _attrs(when_match.group(1)))
+    }
+
+
+def _action_character(action_id: str, body: str, terminators: Mapping[str, str]) -> str | None:
+    if action_id.startswith(_ACTION_PREFIX):
+        try:
+            return chr(int(action_id.removeprefix(_ACTION_PREFIX), 16))
+        except ValueError:
+            return None
+
+    for match in _WHEN_RE.finditer(body):
+        parsed = _attrs(match.group(1))
+        if parsed.get("state") != "none":
+            continue
+        if "output" in parsed:
+            output = _xml_unescape(parsed["output"])
+        elif "next" in parsed:
+            output = terminators.get(parsed["next"], "")
+        else:
+            continue
+        if len(output) == 1 and output.isprintable():
+            return output
+    return None
+
+
+def _remove_compose_branches(body: str) -> str:
+    kept_lines: list[str] = []
+    for line in body.splitlines():
+        when_match = _WHEN_RE.search(line)
+        if when_match is None or _attrs(when_match.group(1)).get("state") != "compose":
+            kept_lines.append(line)
+    return "\n".join(kept_lines)
+
+
+def _has_compose_root(lines: Iterable[str]) -> bool:
+    return any(
+        (when_match := _WHEN_RE.search(line)) is not None
+        and _attrs(when_match.group(1)).get("state") == "compose"
+        for line in lines
     )
 
-    lines.append("  </actions>")
-    return "\n".join(lines)
 
+def _inject_generated_transitions(keylayout: str, additions: Mapping[str, list[str]]) -> str:
+    existing = {action_id for action_id, _body in _ACTION_BLOCK_RE.findall(keylayout)}
+    missing = sorted(set(additions) - existing)
+    if missing:
+        msg = f"missing action ids: {', '.join(missing[:20])}"
+        raise ValueError(msg)
 
-def _generate_terminators(trie: _TrieNode) -> str:
-    lines = ["  <terminators>", '\t<when state="compose" output="" />']
-    for prefix in sorted(_collect_prefixes(trie)):
-        output = _node_at(trie, prefix)["output"]
-        if output is not None:
-            lines.append(f'\t<when state="{_state_id(prefix)}" output="{_xml_escape(output)}" />')
-    lines.append("  </terminators>")
-    return "\n".join(lines)
+    def replace(match: re.Match[str]) -> str:
+        action_id = match.group(1)
+        lines = additions.get(action_id)
+        if not lines:
+            return match.group(0)
 
+        body = _remove_compose_branches(match.group(2)) if _has_compose_root(lines) else match.group(2)
+        return f'\n\t<action id="{action_id}">{body}\n' + "\n".join(lines) + "\n\t</action>"
 
-def _replace_generated_sections(keylayout: str, actions: str, terminators: str) -> str:
-    keylayout = re.sub(r"  <actions>.*?  </actions>", actions, keylayout, flags=re.DOTALL)
-    return re.sub(r"  <terminators>.*?  </terminators>", terminators, keylayout, flags=re.DOTALL)
+    return _ACTION_BLOCK_RE.sub(replace, keylayout)
 
 
 def _utf16_units(value: str) -> int:
