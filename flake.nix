@@ -36,7 +36,8 @@
     in {
       generated-keylayout-hash = pkgs.runCommand "generated-keylayout-hash" {} ''
         expected="13464b4fa2aeefc06beb8977d7812e32e8d09e102a8b436760d9be08368df9e7"
-        actual="$(${pkgs.coreutils}/bin/sha256sum ${package}/programmer_dvorak_compose.keylayout | ${pkgs.coreutils}/bin/cut -d ' ' -f 1)"
+        keylayout="${package}/Library/Keyboard Layouts/Programmer Dvorak Compose.bundle/Contents/Resources/Programmer Dvorak Compose.keylayout"
+        actual="$(${pkgs.coreutils}/bin/sha256sum "$keylayout" | ${pkgs.coreutils}/bin/cut -d ' ' -f 1)"
 
         if [ "$actual" != "$expected" ]; then
           echo "expected $expected, got $actual"
@@ -70,6 +71,11 @@
     homeManagerModules = {
       default = import ./home-manager.nix self;
       programmer-dvorak-compose = self.homeManagerModules.default;
+    };
+
+    darwinModules = {
+      default = import ./nix-darwin.nix self;
+      programmer-dvorak-compose = self.darwinModules.default;
     };
   };
 }
