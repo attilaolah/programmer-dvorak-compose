@@ -3,6 +3,7 @@
 import html
 from typing import Protocol, cast
 
+import pytest
 from defusedxml import ElementTree
 
 from scripts import generate_keylayout
@@ -108,7 +109,79 @@ SEQUENCES: dict[generate_keylayout.ComposeSequence, str] = {
 }
 
 
-def generated_layout() -> str:
+@pytest.fixture(scope="session")
+def generated_root() -> XmlElement:
+    """Return the parsed generated fixture layout."""
+    return _parse_layout(_generated_layout())
+
+
+def test_generated_fixture_is_parseable_xml(generated_root: XmlElement) -> None:
+    """Generated fixture output is valid XML when the fixture contains no control references."""
+    assert generated_root.attrib["name"] == "Base"
+
+
+def test_key_actions_resolve_and_actions_are_not_empty(generated_root: XmlElement) -> None:
+    """All key action references resolve and every action has behavior."""
+    ids = _action_ids(generated_root)
+
+    assert set(_key_action_refs(generated_root)) <= ids
+    assert all(action.findall("when") for action in generated_root.findall(".//action"))
+
+
+def test_no_action_has_duplicate_state_branches(generated_root: XmlElement) -> None:
+    """Generated additions do not leave duplicate state branches in one action."""
+    for action in generated_root.findall(".//action"):
+        states = [when.attrib["state"] for when in action.findall("when")]
+        assert len(states) == len(set(states)), action.attrib["id"]
+
+
+def test_original_actions_are_preferred_for_promoted_keys_and_roots(generated_root: XmlElement) -> None:
+    """Dash and equals keep their original physical-key actions for generated roots."""
+    whens = _action_when_by_state(generated_root)
+
+    assert _action_for_key_code(generated_root, "1") == "dash"
+    assert _action_for_key_code(generated_root, "2") == "doubleacute"
+    assert whens["dash"]["compose"].attrib["next"] == generate_keylayout.state_id(("-",))
+    assert whens["doubleacute"]["compose"].attrib["next"] == generate_keylayout.state_id(("=",))
+
+
+@pytest.mark.parametrize(
+    ("sequence", "output"),
+    [
+        (("L", "L", "A", "P"), "🖖"),
+        (("p", "o", "o"), "💩"),
+        (("-", "-", "-"), "—"),
+        (("-", ">"), "→"),
+        (("<", "-"), "←"),
+        (("=", ">"), "⇒"),
+        (("<", "="), "≤"),
+        ((">", "="), "≥"),
+        ((".", "."), "…"),
+    ],
+)
+def test_representative_generated_paths_exist(
+    generated_root: XmlElement,
+    sequence: tuple[str, ...],
+    output: str,
+) -> None:
+    """Representative XKB compose paths are present in the generated graph."""
+    _assert_compose_output(generated_root, sequence, output)
+
+
+def test_generated_xml_sensitive_outputs_use_numeric_escapes() -> None:
+    """XML-sensitive generated output attributes use numeric escapes."""
+    layout = _generated_layout()
+
+    assert 'output="&#x26;"' in layout
+    assert 'output="&#x22;"' in layout
+    assert 'output="&#x3C;"' in layout
+    assert 'output="&#x3E;"' in layout
+    assert 'output="&amp;"' not in layout
+    assert 'output="&quot;"' not in layout
+    assert html.unescape("&#x26;&#x22;&#x3C;&#x3E;") == '&"<>'
+
+
+def _generated_layout() -> str:
     """Return a generated layout from the small test fixture."""
     original_actions = generate_keylayout.parse_original_actions(BASE_LAYOUT)
     action_names = generate_keylayout.discover_action_names(BASE_LAYOUT, original_actions)
@@ -125,7 +198,7 @@ def generated_layout() -> str:
     )
 
 
-def parse_layout(layout: str) -> XmlElement:
+def _parse_layout(layout: str) -> XmlElement:
     """Parse a keylayout XML snippet with entity expansion protections.
 
     Returns:
@@ -134,24 +207,24 @@ def parse_layout(layout: str) -> XmlElement:
     return cast("XmlElement", ElementTree.fromstring(layout))
 
 
-def action_ids(root: XmlElement) -> set[str]:
+def _action_ids(root: XmlElement) -> set[str]:
     """Return all action IDs in an ElementTree layout."""
     return {action.attrib["id"] for action in root.findall(".//action")}
 
 
-def key_action_refs(root: XmlElement) -> list[str]:
+def _key_action_refs(root: XmlElement) -> list[str]:
     """Return key action references in an ElementTree layout."""
     return [key.attrib["action"] for key in root.findall(".//key") if "action" in key.attrib]
 
 
-def action_for_key_code(root: XmlElement, code: str) -> str:
+def _action_for_key_code(root: XmlElement, code: str) -> str:
     """Return the action ID used by a key code."""
     key = root.find(f'.//key[@code="{code}"]')
     assert key is not None, f"missing key code {code}"
     return key.attrib["action"]
 
 
-def action_when_by_state(root: XmlElement) -> dict[str, dict[str, XmlElement]]:
+def _action_when_by_state(root: XmlElement) -> dict[str, dict[str, XmlElement]]:
     """Return action when elements keyed by action ID and state."""
     result: dict[str, dict[str, XmlElement]] = {}
     for action in root.findall(".//action"):
@@ -159,21 +232,21 @@ def action_when_by_state(root: XmlElement) -> dict[str, dict[str, XmlElement]]:
     return result
 
 
-def assert_compose_output(root: XmlElement, sequence: tuple[str, ...], output: str) -> None:
+def _assert_compose_output(root: XmlElement, sequence: tuple[str, ...], output: str) -> None:
     """Assert that a compose sequence follows generated transitions to an output."""
     key_actions = {
-        "L": action_for_key_code(root, "6"),
-        "A": action_for_key_code(root, "7"),
-        "p": action_for_key_code(root, "8"),
-        "o": action_for_key_code(root, "9"),
-        "P": action_for_key_code(root, "12"),
-        "-": action_for_key_code(root, "1"),
-        "=": action_for_key_code(root, "2"),
-        "<": action_for_key_code(root, "3"),
-        ">": action_for_key_code(root, "4"),
-        ".": action_for_key_code(root, "5"),
+        "L": _action_for_key_code(root, "6"),
+        "A": _action_for_key_code(root, "7"),
+        "p": _action_for_key_code(root, "8"),
+        "o": _action_for_key_code(root, "9"),
+        "P": _action_for_key_code(root, "12"),
+        "-": _action_for_key_code(root, "1"),
+        "=": _action_for_key_code(root, "2"),
+        "<": _action_for_key_code(root, "3"),
+        ">": _action_for_key_code(root, "4"),
+        ".": _action_for_key_code(root, "5"),
     }
-    whens = action_when_by_state(root)
+    whens = _action_when_by_state(root)
     state = "compose"
     actual_output: str | None = None
     for character in sequence:
@@ -185,68 +258,3 @@ def assert_compose_output(root: XmlElement, sequence: tuple[str, ...], output: s
         state = when.attrib["next"]
 
     assert actual_output == output, f"sequence {sequence!r}"
-
-
-def test_generated_fixture_is_parseable_xml() -> None:
-    """Generated fixture output is valid XML when the fixture contains no control references."""
-    parse_layout(generated_layout())
-
-
-def test_key_actions_resolve_and_actions_are_not_empty() -> None:
-    """All key action references resolve and every action has behavior."""
-    root = parse_layout(generated_layout())
-    ids = action_ids(root)
-
-    assert set(key_action_refs(root)) <= ids
-    assert all(action.findall("when") for action in root.findall(".//action"))
-
-
-def test_no_action_has_duplicate_state_branches() -> None:
-    """Generated additions do not leave duplicate state branches in one action."""
-    root = parse_layout(generated_layout())
-
-    for action in root.findall(".//action"):
-        states = [when.attrib["state"] for when in action.findall("when")]
-        assert len(states) == len(set(states)), action.attrib["id"]
-
-
-def test_original_actions_are_preferred_for_promoted_keys_and_roots() -> None:
-    """Dash and equals keep their original physical-key actions for generated roots."""
-    root = parse_layout(generated_layout())
-    whens = action_when_by_state(root)
-
-    assert action_for_key_code(root, "1") == "dash"
-    assert action_for_key_code(root, "2") == "doubleacute"
-    assert whens["dash"]["compose"].attrib["next"] == generate_keylayout.state_id(("-",))
-    assert whens["doubleacute"]["compose"].attrib["next"] == generate_keylayout.state_id(("=",))
-
-
-def test_representative_generated_paths_exist() -> None:
-    """Representative XKB compose paths are present in the generated graph."""
-    root = parse_layout(generated_layout())
-
-    for sequence, output in {
-        ("L", "L", "A", "P"): "🖖",
-        ("p", "o", "o"): "💩",
-        ("-", "-", "-"): "—",
-        ("-", ">"): "→",
-        ("<", "-"): "←",
-        ("=", ">"): "⇒",
-        ("<", "="): "≤",
-        (">", "="): "≥",
-        (".", "."): "…",
-    }.items():
-        assert_compose_output(root, sequence, output)
-
-
-def test_generated_xml_sensitive_outputs_use_numeric_escapes() -> None:
-    """XML-sensitive generated output attributes use numeric escapes."""
-    layout = generated_layout()
-
-    assert 'output="&#x26;"' in layout
-    assert 'output="&#x22;"' in layout
-    assert 'output="&#x3C;"' in layout
-    assert 'output="&#x3E;"' in layout
-    assert 'output="&amp;"' not in layout
-    assert 'output="&quot;"' not in layout
-    assert html.unescape("&#x26;&#x22;&#x3C;&#x3E;") == '&"<>'
