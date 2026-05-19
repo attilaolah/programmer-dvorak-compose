@@ -71,5 +71,10 @@
       default = import ./home-manager.nix self;
       programmer-dvorak-compose = self.homeManagerModules.default;
     };
+
+    darwinModules = {
+      default = import ./nix-darwin.nix self;
+      programmer-dvorak-compose = self.darwinModules.default;
+    };
   };
 }

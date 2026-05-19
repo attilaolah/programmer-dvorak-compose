@@ -16,8 +16,10 @@ This flake exposes:
 - `packages.${system}.default`: the four keyboard layout files with snake_case store paths.
 - `overlays.default`: adds `pkgs."programmer-dvorak-compose"`.
 - `homeManagerModules.default`: installs the macOS bundle under `~/Library/Keyboard Layouts`.
+- `darwinModules.default`: installs the macOS bundle globally under `/Library/Keyboard Layouts`.
 
 The Home Manager entries are guarded with `pkgs.stdenv.isDarwin` and install the bundle as real directories with per-file symlinks.
+The nix-darwin module installs the global bundle during activation by copying the Nix store files into a real bundle. This avoids per-file symlinks, which macOS may not discover for global keyboard layouts.
 
 Example:
 
@@ -32,6 +34,25 @@ Example:
     homeConfigurations.example = home-manager.lib.homeManagerConfiguration {
       modules = [
         programmer-dvorak-compose.homeManagerModules.default
+      ];
+    };
+  };
+}
+```
+
+For a global install through nix-darwin:
+
+```nix
+{
+  inputs.programmer-dvorak-compose.url = "github:attilaolah/programmer-dvorak-compose";
+
+  outputs = inputs @ {
+    programmer-dvorak-compose,
+    ...
+  }: {
+    darwinConfigurations.example = nix-darwin.lib.darwinSystem {
+      modules = [
+        programmer-dvorak-compose.darwinModules.default
       ];
     };
   };
