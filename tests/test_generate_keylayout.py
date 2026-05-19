@@ -1,6 +1,7 @@
 """Tests for the macOS keylayout generator."""
 
 import html
+from pathlib import Path
 from typing import Protocol, cast
 
 import pytest
@@ -8,75 +9,7 @@ from defusedxml import ElementTree
 
 from scripts import generate_keylayout
 
-_BASE_LAYOUT = """<?xml version="1.0" encoding="UTF-8"?>
-<keyboard group="0" id="1" name="Base" maxout="1">
-  <keyMapSet id="ANSI">
-    <keyMap index="0">
-      <key code="1" output="-" />
-      <key code="2" output="=" />
-      <key code="3" output="&lt;" />
-      <key code="4" output="&gt;" />
-      <key code="5" output="." />
-      <key code="6" output="L" />
-      <key code="7" output="A" />
-      <key code="8" output="p" />
-      <key code="9" output="o" />
-      <key code="10" output="&amp;" />
-      <key code="11" output="&quot;" />
-      <key code="12" output="P" />
-    </keyMap>
-  </keyMapSet>
-  <actions>
-  <action id="compose">
-    <when state="none" next="compose" />
-  </action>
-  <action id="dash">
-    <when state="none" output="-" />
-    <when state="compose" next="macron" />
-    <when state="dot" output="&#xB7;" />
-  </action>
-  <action id="doubleacute">
-    <when state="none" output="=" />
-    <when state="compose" next="doubleacute" />
-  </action>
-  <action id="less">
-    <when state="none" output="&#x3C;" />
-    <when state="compose" next="less" />
-  </action>
-  <action id="greater">
-    <when state="none" output=">" />
-    <when state="compose" next="greater" />
-  </action>
-  <action id="period">
-    <when state="none" output="." />
-    <when state="compose" next="dot" />
-    <when state="dot" output="&#x2026;" />
-  </action>
-  <action id="L">
-    <when state="none" output="L" />
-  </action>
-  <action id="A">
-    <when state="none" output="A" />
-  </action>
-  <action id="p">
-    <when state="none" output="p" />
-  </action>
-  <action id="o">
-    <when state="none" output="o" />
-  </action>
-  <action id="P">
-    <when state="none" output="P" />
-  </action>
-  </actions>
-  <terminators>
-  <when state="compose" output="" />
-  <when state="macron" output="-" />
-  <when state="doubleacute" output="=" />
-  <when state="dot" output="." />
-  </terminators>
-</keyboard>
-"""
-
+_BASE_LAYOUT = (Path(__file__).with_name("testdata") / "base.keylayout.xml").read_text(encoding="utf-8")
 _SEQUENCES: dict[generate_keylayout.ComposeSequence, str] = {
     ("L", "L", "A", "P"): "🖖",
     ("p", "o", "o"): "💩",
