@@ -6,7 +6,7 @@ self: {
   config = lib.mkIf pkgs.stdenv.isDarwin (let
     package = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
   in {
-    system.activationScripts.programmer-dvorak-compose.text = ''
+    system.activationScripts.keyboard.text = lib.mkAfter ''
       set -eu
 
       src="${package}/Library/Keyboard Layouts/Programmer Dvorak Compose.bundle"
