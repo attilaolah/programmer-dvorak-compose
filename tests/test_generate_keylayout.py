@@ -1,4 +1,5 @@
 """Tests for the macOS keylayout generator."""
+
 # ruff: noqa: S314, S405
 
 from __future__ import annotations
