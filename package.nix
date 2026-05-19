@@ -12,7 +12,7 @@
 in
   stdenvNoCC.mkDerivation {
     pname = "programmer-dvorak-compose";
-    version = "1.2.1";
+    version = "1.4.0";
 
     src = ./.;
 
