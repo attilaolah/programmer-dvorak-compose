@@ -31,6 +31,19 @@
       default = package;
     });
 
+    devShells = forAllSystems (pkgs: {
+      default = pkgs.mkShellNoCC {
+        packages = with pkgs; [
+          pyright
+          (python314.withPackages (ps:
+            with ps; [
+              defusedxml
+              pytest
+            ]))
+        ];
+      };
+    });
+
     homeManagerModules = {
       default = import ./home-manager.nix self;
       programmer-dvorak-compose = self.homeManagerModules.default;
