@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
   <key>BuildVersion</key>
-  <string>1.4.0</string>
+  <string>@version@</string>
   <key>CFBundleVersion</key>
-  <string>1.4.0</string>
+  <string>@version@</string>
   <key>ProjectName</key>
   <string>Programmer Dvorak Compose</string>
   <key>SourceVersion</key>
-  <string>1.4.0</string>
+  <string>@version@</string>
 </dict>
 </plist>

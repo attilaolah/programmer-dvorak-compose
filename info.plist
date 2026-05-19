@@ -7,7 +7,7 @@
   <key>CFBundleName</key>
   <string>Programmer Dvorak Compose</string>
   <key>CFBundleVersion</key>
-  <string>1.4.0</string>
+  <string>@version@</string>
   <key>KLInfo_Programmer Dvorak Compose</key>
   <dict>
     <key>TISInputSourceID</key>
