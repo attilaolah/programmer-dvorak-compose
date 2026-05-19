@@ -1,13 +1,28 @@
 """Tests for the macOS keylayout generator."""
 
-# ruff: noqa: S314, S405
-
 from __future__ import annotations
 
 import html
-import xml.etree.ElementTree as ET
+from typing import Protocol, cast
+
+from defusedxml import ElementTree
 
 from scripts import generate_keylayout
+
+
+class XmlElement(Protocol):
+    """Minimal ElementTree element protocol used by the tests."""
+
+    attrib: dict[str, str]
+
+    def find(self, path: str) -> XmlElement | None:
+        """Return the first matching child element."""
+        ...
+
+    def findall(self, path: str) -> list[XmlElement]:
+        """Return all matching child elements."""
+        ...
+
 
 BASE_LAYOUT = """<?xml version="1.0" encoding="UTF-8"?>
 <keyboard group="0" id="1" name="Base" maxout="1">
@@ -112,32 +127,41 @@ def generated_layout() -> str:
     )
 
 
-def action_ids(root: ET.Element) -> set[str]:
+def parse_layout(layout: str) -> XmlElement:
+    """Parse a keylayout XML snippet with entity expansion protections.
+
+    Returns:
+        The parsed root XML element.
+    """
+    return cast("XmlElement", ElementTree.fromstring(layout))
+
+
+def action_ids(root: XmlElement) -> set[str]:
     """Return all action IDs in an ElementTree layout."""
     return {action.attrib["id"] for action in root.findall(".//action")}
 
 
-def key_action_refs(root: ET.Element) -> list[str]:
+def key_action_refs(root: XmlElement) -> list[str]:
     """Return key action references in an ElementTree layout."""
     return [key.attrib["action"] for key in root.findall(".//key") if "action" in key.attrib]
 
 
-def action_for_key_code(root: ET.Element, code: str) -> str:
+def action_for_key_code(root: XmlElement, code: str) -> str:
     """Return the action ID used by a key code."""
     key = root.find(f'.//key[@code="{code}"]')
     assert key is not None, f"missing key code {code}"
     return key.attrib["action"]
 
 
-def action_when_by_state(root: ET.Element) -> dict[str, dict[str, ET.Element]]:
+def action_when_by_state(root: XmlElement) -> dict[str, dict[str, XmlElement]]:
     """Return action when elements keyed by action ID and state."""
-    result: dict[str, dict[str, ET.Element]] = {}
+    result: dict[str, dict[str, XmlElement]] = {}
     for action in root.findall(".//action"):
         result[action.attrib["id"]] = {when.attrib["state"]: when for when in action.findall("when")}
     return result
 
 
-def assert_compose_output(root: ET.Element, sequence: tuple[str, ...], output: str) -> None:
+def assert_compose_output(root: XmlElement, sequence: tuple[str, ...], output: str) -> None:
     """Assert that a compose sequence follows generated transitions to an output."""
     key_actions = {
         "L": action_for_key_code(root, "6"),
@@ -167,12 +191,12 @@ def assert_compose_output(root: ET.Element, sequence: tuple[str, ...], output: s
 
 def test_generated_fixture_is_parseable_xml() -> None:
     """Generated fixture output is valid XML when the fixture contains no control references."""
-    ET.fromstring(generated_layout())
+    parse_layout(generated_layout())
 
 
 def test_key_actions_resolve_and_actions_are_not_empty() -> None:
     """All key action references resolve and every action has behavior."""
-    root = ET.fromstring(generated_layout())
+    root = parse_layout(generated_layout())
     ids = action_ids(root)
 
     assert set(key_action_refs(root)) <= ids
@@ -181,7 +205,7 @@ def test_key_actions_resolve_and_actions_are_not_empty() -> None:
 
 def test_no_action_has_duplicate_state_branches() -> None:
     """Generated additions do not leave duplicate state branches in one action."""
-    root = ET.fromstring(generated_layout())
+    root = parse_layout(generated_layout())
 
     for action in root.findall(".//action"):
         states = [when.attrib["state"] for when in action.findall("when")]
@@ -190,7 +214,7 @@ def test_no_action_has_duplicate_state_branches() -> None:
 
 def test_original_actions_are_preferred_for_promoted_keys_and_roots() -> None:
     """Dash and equals keep their original physical-key actions for generated roots."""
-    root = ET.fromstring(generated_layout())
+    root = parse_layout(generated_layout())
     whens = action_when_by_state(root)
 
     assert action_for_key_code(root, "1") == "dash"
@@ -201,7 +225,7 @@ def test_original_actions_are_preferred_for_promoted_keys_and_roots() -> None:
 
 def test_representative_generated_paths_exist() -> None:
     """Representative XKB compose paths are present in the generated graph."""
-    root = ET.fromstring(generated_layout())
+    root = parse_layout(generated_layout())
 
     for sequence, output in {
         ("L", "L", "A", "P"): "🖖",

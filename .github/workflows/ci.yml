@@ -45,10 +45,18 @@ jobs:
       run: nix run nixpkgs#ruff -- check
 
     - name: Check pytest
-      run: nix run nixpkgs#python314Packages.pytest -- tests
+      run: |
+        nix shell --impure --expr \
+          'with import (builtins.getFlake "nixpkgs") {}; python314.withPackages (ps: [ ps.pytest ps.defusedxml ])' \
+          -c pytest tests
 
     - name: Check Pyright
-      run: nix run nixpkgs#pyright
+      run: |
+        pyright_env='with import (builtins.getFlake "nixpkgs") {}; [
+          pyright
+          (python314.withPackages (ps: [ ps.defusedxml ]))
+        ]'
+        nix shell --impure --expr "$pyright_env" -c pyright
 
     - name: Lint info.plist
       run: nix run nixpkgs#libplist -- -i info.plist -f xml -o /dev/null
