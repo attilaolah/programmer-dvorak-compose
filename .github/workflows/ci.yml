@@ -44,8 +44,20 @@ jobs:
     - name: Check Ruff
       run: nix run nixpkgs#ruff -- check
 
+    - name: Check pytest
+      run: nix run nixpkgs#python314Packages.pytest -- tests
+
     - name: Check Pyright
       run: nix run nixpkgs#pyright
+
+    - name: Lint info.plist
+      run: nix run nixpkgs#libplist -- -i info.plist -f xml -o /dev/null
+
+    - name: Lint version.plist
+      run: nix run nixpkgs#libplist -- -i version.plist -f xml -o /dev/null
+
+    - name: Lint localized info plist strings
+      run: nix run nixpkgs#libplist -- -i resources/english.lproj/info_plist.strings -f xml -o /dev/null
 
     - name: Check ty
       run: nix run nixpkgs#ty -- check .
