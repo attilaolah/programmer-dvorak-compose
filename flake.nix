@@ -31,6 +31,22 @@
       default = package;
     });
 
+    checks = forAllSystems (pkgs: let
+      package = pkgs.callPackage ./package.nix {};
+    in {
+      generated-keylayout-hash = pkgs.runCommand "generated-keylayout-hash" {} ''
+        expected="13464b4fa2aeefc06beb8977d7812e32e8d09e102a8b436760d9be08368df9e7"
+        actual="$(${pkgs.coreutils}/bin/sha256sum ${package}/programmer_dvorak_compose.keylayout | ${pkgs.coreutils}/bin/cut -d ' ' -f 1)"
+
+        if [ "$actual" != "$expected" ]; then
+          echo "expected $expected, got $actual"
+          exit 1
+        fi
+
+        touch "$out"
+      '';
+    });
+
     devShells = forAllSystems (pkgs: {
       default = pkgs.mkShellNoCC {
         packages = with pkgs; [
