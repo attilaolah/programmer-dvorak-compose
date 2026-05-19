@@ -5,5 +5,11 @@ result-*
 # Ignore automatically generated direnv output
 .direnv
 
+# Ignore Python bytecode and tool caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
 # Ignore NixOS interactive test driver history
 **/.nixos-test-history

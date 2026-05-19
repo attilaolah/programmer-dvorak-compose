@@ -4,15 +4,27 @@
   lib,
   python314,
   stdenvNoCC,
+  replaceVars,
+  version ? (builtins.fromTOML (builtins.readFile ./pyproject.toml)).project.version,
 }: let
+  infoPlist = replaceVars ./info.plist {
+    inherit version;
+  };
+  versionPlist = replaceVars ./version.plist {
+    inherit version;
+  };
   programmerDvorakPkg = fetchurl {
-    url = "https://www.kaufmann.no/downloads/macos/ProgrammerDvorak-1_2_13.pkg.zip";
+    urls = [
+      "https://www.kaufmann.no/downloads/macos/ProgrammerDvorak-1_2_13.pkg.zip"
+      "https://ipfs.io/ipfs/bafkreieef75poffkvsi3akd4jzcxn4ml4g74gjutockzhiiyk4vhzr4aay"
+      "https://dweb.link/ipfs/bafkreieef75poffkvsi3akd4jzcxn4ml4g74gjutockzhiiyk4vhzr4aay"
+    ];
     hash = "sha256-hC/69xSqrJGwKHxORXbxi+G/wyaTcJWToRhXKnzHgAY=";
   };
 in
   stdenvNoCC.mkDerivation {
     pname = "programmer-dvorak-compose";
-    version = "1.2.1";
+    inherit version;
 
     src = ./.;
 
@@ -36,8 +48,8 @@ in
     installPhase = ''
       runHook preInstall
 
-      install -Dm0644 info.plist "$out/info.plist"
-      install -Dm0644 version.plist "$out/version.plist"
+      install -Dm0644 ${infoPlist} "$out/info.plist"
+      install -Dm0644 ${versionPlist} "$out/version.plist"
       install -Dm0644 resources/english.lproj/info_plist.strings "$out/info_plist.strings"
       install -Dm0644 programmer_dvorak_compose.keylayout "$out/programmer_dvorak_compose.keylayout"
 

@@ -1,6 +1,6 @@
 [project]
 name = "programmer-dvorak-compose"
-version = "1.2.1"
+version = "1.4.0"
 description = "Programmer Dvorak keyboard layout with Linux-style compose key sequences"
 readme = "README.md"
 requires-python = ">=3.14"
