@@ -1,6 +1,5 @@
 """Tests for the macOS keylayout generator."""
-# ruff: noqa: DOC501, S314, S405, SLF001
-# pyright: reportPrivateUsage=false
+# ruff: noqa: DOC501, S314, S405
 
 from __future__ import annotations
 
@@ -97,18 +96,18 @@ SEQUENCES: dict[generate_keylayout.ComposeSequence, str] = {
 
 def generated_layout() -> str:
     """Return a generated layout from the small test fixture."""
-    original_actions = generate_keylayout._parse_original_actions(BASE_LAYOUT)
-    action_names = generate_keylayout._discover_action_names(BASE_LAYOUT, original_actions)
-    trie = generate_keylayout._build_trie(SEQUENCES)
+    original_actions = generate_keylayout.parse_original_actions(BASE_LAYOUT)
+    action_names = generate_keylayout.discover_action_names(BASE_LAYOUT, original_actions)
+    trie = generate_keylayout.build_trie(SEQUENCES)
 
-    keylayout = generate_keylayout._promote_printable_keys(BASE_LAYOUT, action_names)
-    keylayout = generate_keylayout._insert_generated_passthrough_actions(
+    keylayout = generate_keylayout.promote_printable_keys(BASE_LAYOUT, action_names)
+    keylayout = generate_keylayout.insert_generated_passthrough_actions(
         keylayout,
-        generate_keylayout._generated_passthrough_characters(action_names, original_actions),
+        generate_keylayout.generated_passthrough_characters(action_names, original_actions),
     )
-    return generate_keylayout._inject_generated_transitions(
+    return generate_keylayout.inject_generated_transitions(
         keylayout,
-        generate_keylayout._generate_transition_additions(action_names, trie),
+        generate_keylayout.generate_transition_additions(action_names, trie),
     )
 
 
@@ -196,8 +195,8 @@ def test_original_actions_are_preferred_for_promoted_keys_and_roots() -> None:
 
     assert action_for_key_code(root, "1") == "dash"
     assert action_for_key_code(root, "2") == "doubleacute"
-    assert whens["dash"]["compose"].attrib["next"] == generate_keylayout._state_id(("-",))
-    assert whens["doubleacute"]["compose"].attrib["next"] == generate_keylayout._state_id(("=",))
+    assert whens["dash"]["compose"].attrib["next"] == generate_keylayout.state_id(("-",))
+    assert whens["doubleacute"]["compose"].attrib["next"] == generate_keylayout.state_id(("=",))
 
 
 def test_representative_generated_paths_exist() -> None:

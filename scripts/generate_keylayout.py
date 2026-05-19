@@ -91,8 +91,10 @@ type ComposeSequence = tuple[str, ...]
 type ComposeEntry = tuple[ComposeSequence, str]
 
 
-class _TrieNode(TypedDict):
-    children: dict[str, _TrieNode]
+class ComposeTrieNode(TypedDict):
+    """A trie node for generated XKB compose sequences."""
+
+    children: dict[str, ComposeTrieNode]
     output: str | None
 
 
@@ -106,17 +108,17 @@ def main() -> None:
 
     keylayout = _extract_upstream_keylayout(args.programmer_dvorak_pkg)
     compose_source = _extract_compose_source(args.libx11_src)
-    original_actions = _parse_original_actions(keylayout)
-    action_names = _discover_action_names(keylayout, original_actions)
+    original_actions = parse_original_actions(keylayout)
+    action_names = discover_action_names(keylayout, original_actions)
     sequences = _filter_representable_sequences(_parse_compose(compose_source), action_names)
-    trie = _build_trie(sequences)
+    trie = build_trie(sequences)
 
-    keylayout = _promote_printable_keys(keylayout, action_names)
-    keylayout = _insert_generated_passthrough_actions(
+    keylayout = promote_printable_keys(keylayout, action_names)
+    keylayout = insert_generated_passthrough_actions(
         keylayout,
-        _generated_passthrough_characters(action_names, original_actions),
+        generated_passthrough_characters(action_names, original_actions),
     )
-    keylayout = _inject_generated_transitions(keylayout, _generate_transition_additions(action_names, trie))
+    keylayout = inject_generated_transitions(keylayout, generate_transition_additions(action_names, trie))
     keylayout = re.sub(
         r'<keyboard group="0" id="[^"]+" name="[^"]+" maxout="[^"]+">',
         (
@@ -138,7 +140,12 @@ def _synthetic_action_id(character: str) -> str:
     return _PREFERRED_SYNTHETIC_ACTION_IDS.get(character, _xkb_action_id(character))
 
 
-def _state_id(sequence: Iterable[str]) -> str:
+def state_id(sequence: Iterable[str]) -> str:
+    """Return the generated keylayout state ID for a compose sequence prefix.
+
+    Returns:
+        The stable `xkb_s_...` state ID for the given sequence prefix.
+    """
     return f"{_ACTION_PREFIX}s_{'_'.join(f'{ord(character):04x}' for character in sequence)}"
 
 
@@ -275,14 +282,24 @@ def _parse_compose(compose_source: str) -> list[ComposeEntry]:
     return sequences
 
 
-def _parse_original_actions(keylayout: str) -> dict[str, str]:
+def parse_original_actions(keylayout: str) -> dict[str, str]:
+    """Return upstream action bodies keyed by action ID.
+
+    Returns:
+        The original action body text keyed by action ID.
+    """
     actions: dict[str, str] = {}
     for match in _ACTION_BLOCK_RE.finditer(keylayout):
         actions[match.group(1)] = match.group(2)
     return actions
 
 
-def _discover_action_names(keylayout: str, original_actions: Mapping[str, str]) -> dict[str, str]:
+def discover_action_names(keylayout: str, original_actions: Mapping[str, str]) -> dict[str, str]:
+    """Map printable characters to the action ID that should handle them.
+
+    Returns:
+        A character-to-action mapping that prefers upstream actions when available.
+    """
     action_names: dict[str, str] = {}
     terminators = _terminator_outputs(keylayout)
     for action_id, body in original_actions.items():
@@ -297,7 +314,13 @@ def _discover_action_names(keylayout: str, original_actions: Mapping[str, str]) 
     return action_names
 
 
-def _promote_printable_keys(keylayout: str, action_names: Mapping[str, str]) -> str:
+def promote_printable_keys(keylayout: str, action_names: Mapping[str, str]) -> str:
+    """Replace direct printable key outputs with action references when possible.
+
+    Returns:
+        The keylayout text with representable printable key outputs promoted to actions.
+    """
+
     def replace(match: re.Match[str]) -> str:
         value = _xml_unescape(match.group(2))
         if (action_id := action_names.get(value)) is None:
@@ -307,10 +330,15 @@ def _promote_printable_keys(keylayout: str, action_names: Mapping[str, str]) -> 
     return _KEY_OUTPUT_RE.sub(replace, keylayout)
 
 
-def _generated_passthrough_characters(
+def generated_passthrough_characters(
     action_names: Mapping[str, str],
     original_actions: Mapping[str, str],
 ) -> dict[str, str]:
+    """Return synthetic pass-through actions needed for promoted printable keys.
+
+    Returns:
+        Synthetic action IDs keyed to the character each action should pass through.
+    """
     existing_action_ids = set(original_actions)
     return {
         action_id: character
@@ -319,7 +347,12 @@ def _generated_passthrough_characters(
     }
 
 
-def _insert_generated_passthrough_actions(keylayout: str, characters_by_action: Mapping[str, str]) -> str:
+def insert_generated_passthrough_actions(keylayout: str, characters_by_action: Mapping[str, str]) -> str:
+    """Insert generated pass-through action blocks before the closing actions tag.
+
+    Returns:
+        The keylayout text with any missing synthetic pass-through actions inserted.
+    """
     if not characters_by_action:
         return keylayout
 
@@ -343,8 +376,13 @@ def _filter_representable_sequences(
     return representable
 
 
-def _build_trie(sequences: Mapping[ComposeSequence, str]) -> _TrieNode:
-    trie: _TrieNode = {"children": {}, "output": None}
+def build_trie(sequences: Mapping[ComposeSequence, str]) -> ComposeTrieNode:
+    """Build a trie from compose sequences to generated outputs.
+
+    Returns:
+        A compose trie whose terminal nodes contain generated outputs.
+    """
+    trie: ComposeTrieNode = {"children": {}, "output": None}
     for sequence, output in sequences.items():
         node = trie
         for character in sequence:
@@ -353,14 +391,14 @@ def _build_trie(sequences: Mapping[ComposeSequence, str]) -> _TrieNode:
     return trie
 
 
-def _node_at(trie: _TrieNode, prefix: Iterable[str]) -> _TrieNode:
+def _node_at(trie: ComposeTrieNode, prefix: Iterable[str]) -> ComposeTrieNode:
     node = trie
     for character in prefix:
         node = node["children"][character]
     return node
 
 
-def _collect_prefixes(trie: _TrieNode, prefix: ComposeSequence = ()) -> list[ComposeSequence]:
+def _collect_prefixes(trie: ComposeTrieNode, prefix: ComposeSequence = ()) -> list[ComposeSequence]:
     prefixes: list[ComposeSequence] = []
     for character, child in trie["children"].items():
         child_prefix = (*prefix, character)
@@ -378,10 +416,18 @@ def _when_line(state: str, output: str | None = None, next_state: str | None = N
     return f'\t  <when state="{state}" output="{_xml_escape(output)}" />'
 
 
-def _generate_transition_additions(action_names: Mapping[str, str], trie: _TrieNode) -> dict[str, list[str]]:
+def generate_transition_additions(
+    action_names: Mapping[str, str],
+    trie: ComposeTrieNode,
+) -> dict[str, list[str]]:
+    """Generate XKB compose transition lines keyed by target action ID.
+
+    Returns:
+        Generated `<when>` lines grouped by the action ID they should be injected into.
+    """
     prefixes = _collect_prefixes(trie)
-    state_for_prefix = {(): "compose", **{prefix: _state_id(prefix) for prefix in prefixes}}
-    children_by_prefix: dict[ComposeSequence, dict[str, _TrieNode]] = {(): trie["children"]}
+    state_for_prefix = {(): "compose", **{prefix: state_id(prefix) for prefix in prefixes}}
+    children_by_prefix: dict[ComposeSequence, dict[str, ComposeTrieNode]] = {(): trie["children"]}
     for prefix in prefixes:
         children_by_prefix[prefix] = _node_at(trie, prefix)["children"]
 
@@ -455,7 +501,15 @@ def _has_compose_root(lines: Iterable[str]) -> bool:
     )
 
 
-def _inject_generated_transitions(keylayout: str, additions: Mapping[str, list[str]]) -> str:
+def inject_generated_transitions(keylayout: str, additions: Mapping[str, list[str]]) -> str:
+    """Inject generated compose transitions into preserved upstream actions.
+
+    Returns:
+        The keylayout text with generated transitions added to existing action blocks.
+
+    Raises:
+        ValueError: If generated transitions target action IDs that are missing.
+    """
     existing = {action_id for action_id, _body in _ACTION_BLOCK_RE.findall(keylayout)}
     missing = sorted(set(additions) - existing)
     if missing:
