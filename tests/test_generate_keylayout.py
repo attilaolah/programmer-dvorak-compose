@@ -1,7 +1,5 @@
 """Tests for the macOS keylayout generator."""
 
-from __future__ import annotations
-
 import html
 from typing import Protocol, cast
 
