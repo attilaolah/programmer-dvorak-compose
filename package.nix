@@ -5,7 +5,7 @@
   python314,
   stdenvNoCC,
   replaceVars,
-  version ? "1.4.0",
+  version ? (builtins.fromTOML (builtins.readFile ./pyproject.toml)).project.version,
 }: let
   infoPlist = replaceVars ./info.plist {
     inherit version;
