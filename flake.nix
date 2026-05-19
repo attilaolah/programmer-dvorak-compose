@@ -34,11 +34,18 @@
     devShells = forAllSystems (pkgs: {
       default = pkgs.mkShellNoCC {
         packages = with pkgs; [
+          alejandra
+          libplist
+          prettier
           pyright
+          ruff
+          ty
           (python314.withPackages (ps:
             with ps; [
               defusedxml
               pytest
+              pyupgrade
+              yamllint
             ]))
         ];
       };
