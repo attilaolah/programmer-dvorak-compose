@@ -27,52 +27,52 @@ _BASE_LAYOUT = """<?xml version="1.0" encoding="UTF-8"?>
     </keyMap>
   </keyMapSet>
   <actions>
-\t<action id="compose">
-\t  <when state="none" next="compose" />
-\t</action>
-\t<action id="dash">
-\t  <when state="none" output="-" />
-\t  <when state="compose" next="macron" />
-\t  <when state="dot" output="&#xB7;" />
-\t</action>
-\t<action id="doubleacute">
-\t  <when state="none" output="=" />
-\t  <when state="compose" next="doubleacute" />
-\t</action>
-\t<action id="less">
-\t  <when state="none" output="&#x3C;" />
-\t  <when state="compose" next="less" />
-\t</action>
-\t<action id="greater">
-\t  <when state="none" output=">" />
-\t  <when state="compose" next="greater" />
-\t</action>
-\t<action id="period">
-\t  <when state="none" output="." />
-\t  <when state="compose" next="dot" />
-\t  <when state="dot" output="&#x2026;" />
-\t</action>
-\t<action id="L">
-\t  <when state="none" output="L" />
-\t</action>
-\t<action id="A">
-\t  <when state="none" output="A" />
-\t</action>
-\t<action id="p">
-\t  <when state="none" output="p" />
-\t</action>
-\t<action id="o">
-\t  <when state="none" output="o" />
-\t</action>
-\t<action id="P">
-\t  <when state="none" output="P" />
-\t</action>
+  <action id="compose">
+    <when state="none" next="compose" />
+  </action>
+  <action id="dash">
+    <when state="none" output="-" />
+    <when state="compose" next="macron" />
+    <when state="dot" output="&#xB7;" />
+  </action>
+  <action id="doubleacute">
+    <when state="none" output="=" />
+    <when state="compose" next="doubleacute" />
+  </action>
+  <action id="less">
+    <when state="none" output="&#x3C;" />
+    <when state="compose" next="less" />
+  </action>
+  <action id="greater">
+    <when state="none" output=">" />
+    <when state="compose" next="greater" />
+  </action>
+  <action id="period">
+    <when state="none" output="." />
+    <when state="compose" next="dot" />
+    <when state="dot" output="&#x2026;" />
+  </action>
+  <action id="L">
+    <when state="none" output="L" />
+  </action>
+  <action id="A">
+    <when state="none" output="A" />
+  </action>
+  <action id="p">
+    <when state="none" output="p" />
+  </action>
+  <action id="o">
+    <when state="none" output="o" />
+  </action>
+  <action id="P">
+    <when state="none" output="P" />
+  </action>
   </actions>
   <terminators>
-\t<when state="compose" output="" />
-\t<when state="macron" output="-" />
-\t<when state="doubleacute" output="=" />
-\t<when state="dot" output="." />
+  <when state="compose" output="" />
+  <when state="macron" output="-" />
+  <when state="doubleacute" output="=" />
+  <when state="dot" output="." />
   </terminators>
 </keyboard>
 """
