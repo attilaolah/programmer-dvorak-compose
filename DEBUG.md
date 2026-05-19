@@ -393,6 +393,98 @@ root-replacement variant with numeric escaping and two-UTF-16-unit outputs
 imports every generated terminal sequence that the debug converter can see,
 without triggering the input-source crash in quick switch tests.
 
+### Physical-key action remapping
+
+After a full reboot test, most compose sequences worked, but dash-led sequences
+such as `--`, `---`, and `->` did not. The generated XKB dash graph was present
+on the original `dash` action, but promotion-only key rewriting had moved the
+physical dash keys to the synthetic pass-through `xkb_002d` action:
+
+```xml
+<action id="xkb_002d">
+  <when state="none" output="-" />
+</action>
+```
+
+That meant `Compose + -` never entered `xkb_s_002d`, even though the state
+graph existed elsewhere. The same class of bug can affect any character where
+the working layout already has a usable original action, but promotion rewires
+the physical key to a synthetic `xkb_....` action.
+
+The debug builder now prefers existing original actions for printable
+characters and only creates synthetic `xkb_....` actions when no original
+action exists. Generated additions are also remapped by character, so generated
+rules from actions such as `xkb_003d` land on the original `doubleacute` action
+when that is the action the physical `=` key uses.
+
+Installed candidate profile:
+
+- physical dash keys reference `dash`
+- physical equals keys reference `doubleacute`
+- no `xkb_002d` or `xkb_003d` pass-through action remains
+- no missing key action references
+- no empty action blocks
+- no duplicate `<when state="...">` branches within an action
+- no named XML entities in generated output attributes
+
+Runtime confirmation after installing the candidate:
+
+```text
+Compose + = + >       -> ⇒
+Compose + < + =       -> ≤
+Compose + > + =       -> ≥
+Compose + . + -       -> ·
+Compose + < + -       -> ←
+Compose + - + >       -> →
+Compose + - + .       -> –
+Compose + - + - + -   -> —
+Compose + . + .       -> …
+```
+
+Conclusion: the physical-key remapping fix restores the missing dash-led and
+equals-led compose families while preserving the previously working generated
+compose sequences.
+
+## Implementation handoff
+
+The debug script is only a probe. The production generator should absorb the
+rules proven above:
+
+1. Preserve the known-working upstream action and terminator scaffold instead
+   of replacing the whole action graph.
+2. Build a character-to-action map from original actions before promoting
+   printable key outputs.
+3. Prefer an existing original action for a printable character; synthesize an
+   `xkb_....` action only when no original action exists.
+4. Generate XKB compose transitions from the libX11 trie and inject them into
+   the preserved action blocks.
+5. Remap generated additions by character onto the action the physical key uses
+   in the promoted base layout. This is what moves generated `xkb_002d` rules
+   onto `dash` and generated `xkb_003d` rules onto `doubleacute`.
+6. When injecting a generated `state="compose"` root into an action, remove any
+   existing root branch from that same action first. Do not leave two
+   `<when state="compose" ... />` branches in one action.
+7. Keep old non-root state-specific branches as compatibility scaffolding.
+   Removing too much of the old graph made macOS stop honoring compose state.
+8. Emit numeric escapes for XML-sensitive output characters: `&#x26;`,
+   `&#x22;`, `&#x3C;`, and `&#x3E;`.
+9. Keep `maxout` derived from generated outputs. The current generated set
+   needs two UTF-16 units.
+
+Suggested pytest suite:
+
+1. Generate a layout from small fixtures and parse it with
+   `xml.etree.ElementTree` to confirm valid XML.
+2. Assert every key `action="..."` reference has a matching `<action id="...">`.
+3. Assert no action block has duplicate `<when state="...">` branches,
+   especially duplicate `state="compose"` roots.
+4. Assert original-action preference for fixture characters equivalent to
+   `dash` and `doubleacute`: physical keys should reference the original action,
+   and generated XKB roots should land on that same action.
+5. Smoke-test generated paths by inspecting action/state transitions for:
+   `LLAP -> 🖖`, `poo -> 💩`, `--- -> —`, `-> -> →`, `<- -> ←`, `=> -> ⇒`,
+   `<= -> ≤`, `>= -> ≥`, and `.. -> …`.
+
 ## Bisection method used
 
 Build variants from the working layout, not by deleting arbitrary lines from

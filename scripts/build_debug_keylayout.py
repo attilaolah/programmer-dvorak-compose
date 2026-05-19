@@ -45,8 +45,16 @@ def prefix_state(prefix: tuple[str, ...]) -> str:
     return "xkb_s_" + "_".join(prefix)
 
 
+def character_actions(layout: str) -> dict[str, str]:
+    actions: dict[str, str] = {}
+    for action_id, character in action_characters(layout).items():
+        actions.setdefault(character, action_id)
+    return actions
+
+
 def build_promotion_only(source: str) -> str:
     added: dict[str, str] = {}
+    existing_actions = character_actions(source)
 
     def replace_key(match: re.Match[str]) -> str:
         prefix, raw_output, suffix = match.groups()
@@ -54,8 +62,10 @@ def build_promotion_only(source: str) -> str:
         if len(output) != 1 or not output.isprintable():
             return match.group(0)
 
-        action_id = xkb_action_id(output)
-        added.setdefault(action_id, output)
+        action_id = existing_actions.get(output)
+        if action_id is None:
+            action_id = xkb_action_id(output)
+            added.setdefault(action_id, output)
         return f'{prefix} action="{action_id}"{suffix}'
 
     promoted = KEY_OUTPUT_RE.sub(replace_key, source)
@@ -250,10 +260,13 @@ def normalized_when_line(match: re.Match[str]) -> str:
 
 def blocked_root_states(base: str, generated: str) -> set[str]:
     base_actions = dict(ACTION_BLOCK_RE.findall(base))
+    base_action_by_character = character_actions(base)
     blocked: set[str] = set()
 
     for action_id, body in ACTION_BLOCK_RE.findall(generated):
-        base_body = base_actions.get(action_id)
+        character = action_character(action_id, body)
+        target_action_id = base_action_by_character.get(character, action_id) if character is not None else action_id
+        base_body = base_actions.get(target_action_id)
         if base_body is None or 'state="compose"' not in base_body:
             continue
         for match in WHEN_RE.finditer(body):
@@ -308,6 +321,15 @@ def selected_additions(
     max_utf16_units: int,
 ) -> dict[str, list[str]]:
     blocked_roots = blocked_root_states(base, generated) if skip_colliding_roots else set()
+    base_action_by_character = character_actions(base)
+
+    def target_action(character: str | None, action_id: str) -> str:
+        if character is None:
+            return action_id
+        if use_xkb_actions:
+            return xkb_action_id(character)
+        return base_action_by_character.get(character, action_id)
+
     records = generated_output_records(
         generated,
         blocked_roots,
@@ -316,16 +338,18 @@ def selected_additions(
     )[:limit]
     allowed: set[str] = set()
     outputs: dict[str, list[str]] = {}
+    generated_actions = dict(ACTION_BLOCK_RE.findall(generated))
 
     for action_id, sequence, raw_line in records:
+        character = action_character(action_id, generated_actions[action_id])
         for index in range(1, len(sequence)):
             allowed.add(prefix_state(sequence[:index]))
-        outputs.setdefault(action_id, []).append(raw_line)
+        outputs.setdefault(target_action(character, action_id), []).append(raw_line)
 
     additions: dict[str, list[str]] = {}
     for action_id, body in ACTION_BLOCK_RE.findall(generated):
         character = action_character(action_id, body)
-        target_action_id = xkb_action_id(character) if use_xkb_actions and character is not None else action_id
+        target_action_id = target_action(character, action_id)
         for match in WHEN_RE.finditer(body):
             parsed = attrs(match.group(1))
             state = parsed.get("state")
