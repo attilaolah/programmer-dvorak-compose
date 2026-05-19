@@ -14,7 +14,11 @@
     inherit version;
   };
   programmerDvorakPkg = fetchurl {
-    url = "https://www.kaufmann.no/downloads/macos/ProgrammerDvorak-1_2_13.pkg.zip";
+    urls = [
+      "https://www.kaufmann.no/downloads/macos/ProgrammerDvorak-1_2_13.pkg.zip"
+      "https://ipfs.io/ipfs/bafkreieef75poffkvsi3akd4jzcxn4ml4g74gjutockzhiiyk4vhzr4aay"
+      "https://dweb.link/ipfs/bafkreieef75poffkvsi3akd4jzcxn4ml4g74gjutockzhiiyk4vhzr4aay"
+    ];
     hash = "sha256-hC/69xSqrJGwKHxORXbxi+G/wyaTcJWToRhXKnzHgAY=";
   };
 in
