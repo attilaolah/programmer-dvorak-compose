@@ -34,7 +34,7 @@ Example:
 
 ```nix
 {
-  inputs.programmer-dvorak-compose.url = "git+file:///Users/olaa/repos/my/programmer-dvorak-compose";
+  inputs.programmer-dvorak-compose.url = "github:attilaolah/programmer-dvorak-compose";
 
   outputs = inputs @ {
     programmer-dvorak-compose,
