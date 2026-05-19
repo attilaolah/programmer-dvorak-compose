@@ -5,8 +5,8 @@
   python314,
   stdenvNoCC,
   replaceVars,
+  version ? "1.4.0",
 }: let
-  version = "1.4.0";
   infoPlist = replaceVars ./info.plist {
     inherit version;
   };
