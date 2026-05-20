@@ -1,4 +1,4 @@
-# Programmer Dvorak Compose ⌨️
+# ⌨️ Programmer Dvorak Compose
 
 > Fork of Roland Kaufmann's macOS DVP keyboard layout, with Linux-style compose key sequences.
 
@@ -21,7 +21,7 @@ The resulting compose key sequences contain all the good stuff, including:
 - Less common punctuations like —, –, ·, ←, →, ≤, ≥, ⇐, ⇒, «, », “, ”, …
 - 🖖 ([`LLAP`](https://en.wikipedia.org/wiki/Vulcan_salute)), 💩 (`poo`) and a few other gems.
 
-## ❄️ Nix: Home Manager + nix-darwin integration
+## ❄️ Nix: Home Manager + nix-darwin
 
 This flake exposes:
 
@@ -35,7 +35,9 @@ The Home Manager entries are guarded with `pkgs.stdenv.isDarwin` and install the
 per-file symlinks. The nix-darwin module installs the global bundle during activation by copying the Nix store files
 into a real bundle. This avoids per-file symlinks, which macOS may not discover for global keyboard layouts.
 
-Example:
+### 🏠 Example Home Manager integration
+
+For a per-user install through Home Manager:
 
 ```nix
 {
@@ -53,6 +55,8 @@ Example:
   };
 }
 ```
+
+### 🍎 Example nix-darwin integration
 
 For a global install through nix-darwin:
 
