@@ -1,6 +1,11 @@
-# programmer-dvorak-compose
+# Programmer Dvorak Compose ⌨️
 
-Fork of Roland Kaufmann's macOS DVP keyboard layout, with Linux-style compose key sequences.
+> Fork of Roland Kaufmann's macOS DVP keyboard layout, with Linux-style compose key sequences.
+
+<img width="359" height="122" alt="Screenshot showcasing the icon in the menu bar"
+  src="https://github.com/user-attachments/assets/4dd70f65-2eba-4597-ac90-2c38b3c389a4" />
+
+---
 
 The packaged `.keylayout` is generated at build time from:
 
@@ -16,7 +21,7 @@ The resulting compose key sequences contain all the good stuff, including:
 - Less common punctuations like —, –, ·, ←, →, ≤, ≥, ⇐, ⇒, «, », “, ”, …
 - 🖖 ([`LLAP`](https://en.wikipedia.org/wiki/Vulcan_salute)), 💩 (`poo`) and a few other gems.
 
-## Nix
+## ❄️ Nix: Home Manager + nix-darwin integration
 
 This flake exposes:
 
