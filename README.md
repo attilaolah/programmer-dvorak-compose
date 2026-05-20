@@ -35,6 +35,10 @@ The Home Manager entries are guarded with `pkgs.stdenv.isDarwin` and install the
 per-file symlinks. The nix-darwin module installs the global bundle during activation by copying the Nix store files
 into a real bundle. This avoids per-file symlinks, which macOS may not discover for global keyboard layouts.
 
+Pro tip: set `inputs.nixpkgs.follows` to your own flake's `nixpkgs` input, and you'll get updates to the compose key
+sequences alongise your regular updates. The result is fully consistent sequences across all your Linux & macOS
+devices.
+
 ### 🏠 Example Home Manager integration
 
 For a per-user install through Home Manager:
