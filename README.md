@@ -2,7 +2,8 @@
 
 > Fork of Roland Kaufmann's macOS DVP keyboard layout, with Linux-style compose key sequences.
 
-<img width="359" height="122" alt="Screenshot 2026-05-20 at 07 28 45" src="https://github.com/user-attachments/assets/4dd70f65-2eba-4597-ac90-2c38b3c389a4" />
+<img width="359" height="122" alt="Screenshot showcasing the icon in the menu bar"
+  src="https://github.com/user-attachments/assets/4dd70f65-2eba-4597-ac90-2c38b3c389a4" />
 
 ---
 
